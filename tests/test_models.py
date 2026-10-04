@@ -127,3 +127,51 @@ def test_correct_wearing() -> None:
     assert wearing.worn_at.tzinfo is not None
     assert wearing.rating == 5
     assert wearing.comment == "Test comment"
+
+
+def test_nested_details_perfume_model() -> None:
+    test_data = {
+        "id": 1,
+        "brand": "Creed",
+        "name": "Aventus",
+        "concentration": "EDP",
+        "collection_items": [
+            {
+                "id": 1,
+                "perfume_id": 1,
+                "kind": "sample",
+                "initial_volume_ml": 1.5,
+                "acquired_on": "2026-05-09",
+                "status": "active",
+                "wearings": [
+                    {
+                        "id": 1,
+                        "collection_item_id": 1,
+                        "worn_at": "2026-10-02T09:30:00+03:00",
+                        "rating": 5,
+                        "comment": "Test comment",
+                    }
+                ],
+            }
+        ],
+        "average_rating": 5.0,
+    }
+
+    perfume = mdl.PerfumeDetails.model_validate(test_data)
+
+    assert perfume.id == 1
+    assert perfume.brand == "Creed"
+    assert perfume.name == "Aventus"
+    assert perfume.concentration == "EDP"
+    assert perfume.average_rating == 5.0
+    assert perfume.collection_items[0].id == 1
+    assert perfume.collection_items[0].perfume_id == 1
+    assert perfume.collection_items[0].kind == "sample"
+    assert perfume.collection_items[0].initial_volume_ml == 1.5
+    assert perfume.collection_items[0].acquired_on == date(2026, 5, 9)
+    assert perfume.collection_items[0].status == "active"
+    assert perfume.collection_items[0].wearings[0].id == 1
+    assert perfume.collection_items[0].wearings[0].collection_item_id == 1
+    assert perfume.collection_items[0].wearings[0].worn_at.tzinfo is not None
+    assert perfume.collection_items[0].wearings[0].rating == 5
+    assert perfume.collection_items[0].wearings[0].comment == "Test comment"

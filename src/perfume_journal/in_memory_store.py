@@ -101,3 +101,40 @@ class InMemoryStore:
         self, collection_item_id: int
     ) -> mdl.CollectionItem | None:
         return self._collection_items.get(collection_item_id)
+
+    def get_perfume_details(self, perfume_id: int) -> mdl.PerfumeDetails:
+        perfume = self._find_perfume(perfume_id)
+        if perfume is None:
+            raise PerfumeNotFoundError("Perfume not found.")
+
+        collection_items_details_list = []
+
+        for item in self._collection_items.values():
+            if item.perfume_id != perfume_id:
+                continue
+
+            wearing_list = []
+
+            for wearing in self._wearings.values():
+                if wearing.collection_item_id == item.id:
+                    wearing_list.append(wearing)
+
+            collection_item_details = mdl.CollectionItemDetails(
+                **item.model_dump(), wearings=wearing_list
+            )
+            collection_items_details_list.append(collection_item_details)
+
+        ratings = [
+            wearing.rating
+            for item in collection_items_details_list
+            for wearing in item.wearings
+            if wearing.rating is not None
+        ]
+
+        average_rating = sum(ratings) / len(ratings) if ratings else None
+
+        return mdl.PerfumeDetails(
+            **perfume.model_dump(),
+            collection_items=collection_items_details_list,
+            average_rating=average_rating,
+        )

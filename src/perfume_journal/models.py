@@ -61,3 +61,12 @@ class WearingCreate(BaseModel):
 class Wearing(WearingCreate):
     id: int
     collection_item_id: int
+
+
+class CollectionItemDetails(CollectionItem):
+    wearings: list[Wearing]
+
+
+class PerfumeDetails(Perfume):
+    collection_items: list[CollectionItemDetails]
+    average_rating: float | None

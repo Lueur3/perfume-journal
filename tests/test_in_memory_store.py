@@ -274,3 +274,76 @@ def test_failed_wearing_creation_does_not_increment_counter() -> None:
     )
 
     assert stored_wearing.id == 1
+
+
+def test_create_perfume_details() -> None:
+    store = ims.InMemoryStore()
+
+    perf = mdl.PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+
+    stored_perf = store.create_perfume(data=perf)
+
+    item1 = mdl.CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+
+    item2 = mdl.CollectionItemCreate(
+        kind="bottle", initial_volume_ml=200, acquired_on=date(2026, 9, 20)
+    )
+
+    stored_item1 = store.create_collection_item(perfume_id=stored_perf.id, data=item1)
+
+    stored_item2 = store.create_collection_item(perfume_id=stored_perf.id, data=item2)
+
+    wearing1 = mdl.WearingCreate.model_validate(
+        {"worn_at": "2026-10-02T09:30:00+03:00", "rating": 4, "comment": "Test comment"}
+    )
+
+    wearing2 = mdl.WearingCreate.model_validate(
+        {"worn_at": "2026-10-03T09:30:00+03:00", "rating": 8, "comment": "Test comment"}
+    )
+
+    wearing3 = mdl.WearingCreate.model_validate(
+        {"worn_at": "2026-10-03T09:30:00+03:00", "comment": "Test comment"}
+    )
+
+    stored_wearing1 = store.create_wearing(stored_item1.id, wearing1)
+    stored_wearing2 = store.create_wearing(stored_item2.id, wearing2)
+    stored_wearing3 = store.create_wearing(stored_item2.id, wearing3)
+
+    perfume_details = store.get_perfume_details(stored_perf.id)
+
+    assert perfume_details.average_rating == 6.0
+    assert perfume_details.collection_items[0].wearings[0] == stored_wearing1
+    assert perfume_details.collection_items[1].wearings[0] == stored_wearing2
+    assert perfume_details.collection_items[1].wearings[1] == stored_wearing3
+    assert perfume_details.collection_items[1].wearings[1].rating is None
+
+
+def test_perfume_no_rating() -> None:
+    store = ims.InMemoryStore()
+
+    perf = mdl.PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+
+    stored_perf = store.create_perfume(data=perf)
+
+    item = mdl.CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    stored_item = store.create_collection_item(perfume_id=stored_perf.id, data=item)
+
+    wearing = mdl.WearingCreate.model_validate(
+        {"worn_at": "2026-10-02T09:30:00+03:00", "comment": "Test comment"}
+    )
+    store.create_wearing(stored_item.id, wearing)
+
+    perfume_details = store.get_perfume_details(stored_perf.id)
+
+    assert perfume_details.average_rating is None
+
+
+def test_not_exists_perfume() -> None:
+    store = ims.InMemoryStore()
+
+    with pytest.raises(ims.PerfumeNotFoundError):
+        store.get_perfume_details(perfume_id=1)

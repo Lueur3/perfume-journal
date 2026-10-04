@@ -46,3 +46,17 @@ def create_wearing(collection_item_id: int, body: mdl.WearingCreate) -> mdl.Wear
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+
+
+@app.get(
+    "/perfumes/{perfume_id}",
+    response_model=mdl.PerfumeDetails,
+    status_code=status.HTTP_200_OK,
+)
+def get_perfume(perfume_id: int) -> mdl.PerfumeDetails:
+    try:
+        return _store.get_perfume_details(perfume_id)
+    except ims.PerfumeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

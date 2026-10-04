@@ -165,3 +165,54 @@ def test_invalid_wearing_body_returns_422(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_correct_get_perfume(client: TestClient) -> None:
+    perfume_response = client.post(
+        "/perfumes", json={"brand": "Creed", "name": "Aventus", "concentration": "edp"}
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+
+    response = client.get(f"/perfumes/{perfume_id}")
+    details = response.json()
+
+    assert response.status_code == 200
+    assert details["id"] == 1
+    assert details["brand"] == "Creed"
+    assert details["name"] == "Aventus"
+    assert details["concentration"] == "EDP"
+    assert details["average_rating"] == 5.0
+    assert details["collection_items"][0]["id"] == 1
+    assert details["collection_items"][0]["perfume_id"] == 1
+    assert details["collection_items"][0]["kind"] == "sample"
+    assert details["collection_items"][0]["initial_volume_ml"] == 1.5
+    assert details["collection_items"][0]["acquired_on"] == "2026-05-09"
+    assert details["collection_items"][0]["status"] == "active"
+    assert details["collection_items"][0]["wearings"][0]["id"] == 1
+    assert details["collection_items"][0]["wearings"][0]["collection_item_id"] == 1
+    assert "+03:00" in details["collection_items"][0]["wearings"][0]["worn_at"]
+    assert details["collection_items"][0]["wearings"][0]["rating"] == 5
+    assert details["collection_items"][0]["wearings"][0]["comment"] == "Test comment"
+
+
+def test_not_found_perfume(client: TestClient) -> None:
+    response = client.get("/perfumes/1")
+    detail = response.json()["detail"]
+
+    assert response.status_code == 404
+    assert detail == "Perfume not found."

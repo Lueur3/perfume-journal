@@ -4,7 +4,9 @@ Personal perfume collection tracker and journal.
 
 The project currently provides in-memory API slices for creating perfume
 records, adding physical samples or bottles to them, and recording wearings
-for those collection items. Stored data is lost when the application restarts.
+for those collection items. A perfume can be retrieved with its collection
+items, wearing history, and calculated average rating. Stored data is lost when
+the application restarts.
 
 ## Requirements
 
@@ -94,6 +96,18 @@ Responses:
 - `201 Created` — the wearing was created;
 - `404 Not Found` — the referenced collection item does not exist;
 - `422 Unprocessable Content` — the request body is invalid.
+
+### `GET /perfumes/{perfume_id}`
+
+Returns a perfume together with its collection items, each item's wearing
+history, and the average of all specified wearing ratings. Wearings without a
+rating remain in the history but do not affect the average. `average_rating` is
+`null` when no wearing has a rating.
+
+Responses:
+
+- `200 OK` — the assembled perfume details were returned;
+- `404 Not Found` — the referenced perfume does not exist.
 
 ## Development checks
 
