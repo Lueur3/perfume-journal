@@ -3,8 +3,8 @@
 Personal perfume collection tracker and journal.
 
 The project currently provides in-memory API slices for creating perfume
-records and adding physical samples or bottles to them. Stored data is lost
-when the application restarts.
+records, adding physical samples or bottles to them, and recording wearings
+for those collection items. Stored data is lost when the application restarts.
 
 ## Requirements
 
@@ -70,6 +70,29 @@ Responses:
 
 - `201 Created` — the collection item was created;
 - `404 Not Found` — the referenced perfume does not exist;
+- `422 Unprocessable Content` — the request body is invalid.
+
+### `POST /collection-items/{collection_item_id}/wearings`
+
+Records one wearing of an existing collection item. `worn_at` is required and
+must include a timezone offset. `rating` is an optional integer from 1 to 10,
+and `comment` is optional. The server assigns the wearing `id` and takes
+`collection_item_id` from the URL.
+
+Example request:
+
+```json
+{
+  "worn_at": "2026-10-02T09:30:00+03:00",
+  "rating": 5,
+  "comment": "Test comment"
+}
+```
+
+Responses:
+
+- `201 Created` — the wearing was created;
+- `404 Not Found` — the referenced collection item does not exist;
 - `422 Unprocessable Content` — the request body is invalid.
 
 ## Development checks

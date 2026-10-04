@@ -94,3 +94,74 @@ def test_invalid_collection_item_body_returns_422(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_create_wearing(client: TestClient) -> None:
+    perfume_response = client.post(
+        "/perfumes", json={"brand": "Creed", "name": "Aventus", "concentration": "edp"}
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    response = client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+
+    wearing = response.json()
+
+    assert response.status_code == 201
+    assert wearing["id"] == 1
+    assert wearing["collection_item_id"] == collection_item_id
+    assert "+03:00" in wearing["worn_at"]
+    assert wearing["rating"] == 5
+    assert wearing["comment"] == "Test comment"
+
+
+def test_missing_collection_item_returns_404(client: TestClient) -> None:
+    wrong_id = 1
+
+    response = client.post(
+        f"/collection-items/{wrong_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Collection item not found."
+
+
+def test_invalid_wearing_body_returns_422(client: TestClient) -> None:
+    perfume_response = client.post(
+        "/perfumes", json={"brand": "Creed", "name": "Aventus", "concentration": "edp"}
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    response = client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": -5,
+            "comment": "Test comment",
+        },
+    )
+
+    assert response.status_code == 422

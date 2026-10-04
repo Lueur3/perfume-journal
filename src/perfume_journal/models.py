@@ -1,7 +1,14 @@
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, PositiveFloat, StringConstraints, field_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    Field,
+    PositiveFloat,
+    StringConstraints,
+    field_validator,
+)
 
 _KNOWN_CONCENTRATION_ABBREVIATIONS = {"edt", "edp", "edc"}
 
@@ -9,6 +16,8 @@ CleanString = Annotated[str, StringConstraints(strip_whitespace=True, min_length
 
 CollectionItemKind = Literal["sample", "bottle"]
 CollectionItemStatus = Literal["active", "archived"]
+
+WearingRating = Annotated[int, Field(ge=1, le=10)]
 
 
 class PerfumeCreate(BaseModel):
@@ -41,3 +50,14 @@ class CollectionItem(CollectionItemCreate):
     id: int
     perfume_id: int
     status: CollectionItemStatus
+
+
+class WearingCreate(BaseModel):
+    worn_at: AwareDatetime
+    rating: WearingRating | None = None
+    comment: CleanString | None = None
+
+
+class Wearing(WearingCreate):
+    id: int
+    collection_item_id: int
