@@ -28,6 +28,29 @@ uv run uvicorn perfume_journal.api:app --reload
 Interactive API documentation is available at <http://127.0.0.1:8000/docs>, and
 the OpenAPI schema is available at <http://127.0.0.1:8000/openapi.json>.
 
+## PostgreSQL connection check
+
+The diagnostic module uses SQLAlchemy's async engine and asyncpg to run
+`SELECT current_database()`. The API still uses in-memory storage.
+
+Create an empty PostgreSQL database named `perfume_journal`, then set the
+connection parameters in PowerShell 7. Use your server's host and port and
+enter your PostgreSQL role and password when prompted:
+
+```powershell
+$env:PERFUME_DB_HOST = "127.0.0.1"
+$env:PERFUME_DB_PORT = "5432"
+$env:PERFUME_DB_NAME = "perfume_journal"
+$env:PERFUME_DB_USER = Read-Host "PostgreSQL role"
+$env:PERFUME_DB_PASSWORD = Read-Host "PostgreSQL password" -MaskInput
+uv run python -m perfume_journal.db_check
+```
+
+The expected output is `perfume_journal`. Set the variables and run the command
+in the same terminal session. The module reads environment variables directly;
+it does not automatically load a `.env` file. Keep passwords out of source files
+and command output.
+
 ## API
 
 ### `POST /perfumes`
