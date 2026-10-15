@@ -2,7 +2,7 @@ import asyncio
 import os
 
 from sqlalchemy import URL, text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 
 async def main() -> None:
@@ -23,10 +23,12 @@ async def main() -> None:
 
     engine = create_async_engine(db_url)
 
+    session_factory = async_sessionmaker(engine)
+
     try:
-        async with engine.connect() as conn:
+        async with session_factory() as session:
             query = text("SELECT current_database()")
-            result = await conn.execute(query)
+            result = await session.execute(query)
             curr_db: str = result.scalar_one()
 
             print(curr_db)
