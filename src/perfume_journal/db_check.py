@@ -1,26 +1,13 @@
 import asyncio
-import os
 
-from sqlalchemy import URL, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+from perfume_journal.config import get_database_url
 
 
 async def main() -> None:
-    db_name = os.environ["PERFUME_DB_NAME"]
-    db_port = int(os.environ["PERFUME_DB_PORT"])
-    db_host = os.environ["PERFUME_DB_HOST"]
-    db_user = os.environ["PERFUME_DB_USER"]
-    db_password = os.environ["PERFUME_DB_PASSWORD"]
-
-    db_url = URL.create(
-        drivername="postgresql+asyncpg",
-        username=db_user,
-        host=db_host,
-        port=db_port,
-        database=db_name,
-        password=db_password,
-    )
-
+    db_url = get_database_url()
     engine = create_async_engine(db_url)
 
     session_factory = async_sessionmaker(engine)

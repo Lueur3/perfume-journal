@@ -28,28 +28,43 @@ uv run uvicorn perfume_journal.api:app --reload
 Interactive API documentation is available at <http://127.0.0.1:8000/docs>, and
 the OpenAPI schema is available at <http://127.0.0.1:8000/openapi.json>.
 
-## PostgreSQL connection check
+## PostgreSQL setup and migrations
 
-The diagnostic module uses SQLAlchemy's async engine and asyncpg to run
-`SELECT current_database()`. The API still uses in-memory storage.
+SQLAlchemy ORM models and the initial Alembic migration describe the
+`perfumes`, `collection_items`, and `wearings` tables. The API still uses
+in-memory storage; creating these tables does not switch its storage backend.
 
-Create an empty PostgreSQL database named `perfume_journal`, then set the
-connection parameters in PowerShell 7. Use your server's host and port and
-enter your PostgreSQL role and password when prompted:
+Create an empty PostgreSQL database named `perfume_journal`. Copy
+`.env.example` to `.env` in the project root and fill in your local connection
+parameters, including the PostgreSQL role and password. Keep `.env` private;
+only the template belongs in Git.
+
+The shared configuration function loads `.env` with python-dotenv. Existing
+environment variables take precedence over values in the file. No
+`--env-file` argument or repeated PowerShell assignments are needed.
+
+Check the connection:
 
 ```powershell
-$env:PERFUME_DB_HOST = "127.0.0.1"
-$env:PERFUME_DB_PORT = "5432"
-$env:PERFUME_DB_NAME = "perfume_journal"
-$env:PERFUME_DB_USER = Read-Host "PostgreSQL role"
-$env:PERFUME_DB_PASSWORD = Read-Host "PostgreSQL password" -MaskInput
 uv run python -m perfume_journal.db_check
 ```
 
-The expected output is `perfume_journal`. Set the variables and run the command
-in the same terminal session. The module reads environment variables directly;
-it does not automatically load a `.env` file. Keep passwords out of source files
+The diagnostic uses an async session to run `SELECT current_database()`.
+The expected output is `perfume_journal`. Keep passwords out of source files
 and command output.
+
+Apply the checked-in migrations and inspect the current database revision:
+
+```powershell
+uv run alembic upgrade head
+uv run alembic current
+```
+
+The initial revision is `25bdb52d3933`. It creates the three domain tables;
+Alembic tracks the applied revision in its own `alembic_version` table.
+Migration files live in `migrations/versions`. Review generated migrations
+before applying them. Downgrading the initial migration drops the three domain
+tables and their data.
 
 ## API
 
