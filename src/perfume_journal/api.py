@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, status
 
 import perfume_journal.in_memory_store as ims
 import perfume_journal.models as mdl
-from perfume_journal.errors import DuplicatePerfumeError
+from perfume_journal.errors import DuplicatePerfumeError, PerfumeNotFoundError
 
 _store = ims.InMemoryStore()
 
@@ -29,7 +29,7 @@ def create_collection_item(
 ) -> mdl.CollectionItem:
     try:
         return _store.create_collection_item(perfume_id, body)
-    except ims.PerfumeNotFoundError as exc:
+    except PerfumeNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
@@ -57,7 +57,7 @@ def create_wearing(collection_item_id: int, body: mdl.WearingCreate) -> mdl.Wear
 def get_perfume(perfume_id: int) -> mdl.PerfumeDetails:
     try:
         return _store.get_perfume_details(perfume_id)
-    except ims.PerfumeNotFoundError as exc:
+    except PerfumeNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import perfume_journal.models as mdl
 import perfume_journal.orm_models as orm
-from perfume_journal.errors import DuplicatePerfumeError
+from perfume_journal.errors import DuplicatePerfumeError, PerfumeNotFoundError
 from perfume_journal.normalization import create_key
 
 
@@ -50,3 +50,21 @@ async def create_perfume(
             raise DuplicatePerfumeError("This perfume already exists.") from exc
         else:
             raise
+
+
+async def get_perfume(
+    session_factory: async_sessionmaker[AsyncSession],
+    perfume_id: int,
+) -> mdl.Perfume:
+    async with session_factory() as session:
+        result = await session.get(orm.Perfume, perfume_id)
+
+        if result is None:
+            raise PerfumeNotFoundError("Perfume not found.")
+
+        return mdl.Perfume(
+            id=result.id,
+            brand=result.brand,
+            name=result.name,
+            concentration=result.concentration,
+        )

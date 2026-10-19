@@ -4,7 +4,7 @@ import pytest
 
 import perfume_journal.in_memory_store as ims
 import perfume_journal.models as mdl
-from perfume_journal.errors import DuplicatePerfumeError
+from perfume_journal.errors import DuplicatePerfumeError, PerfumeNotFoundError
 
 
 def test_creates_first_perfume_with_expected_attributes() -> None:
@@ -122,7 +122,7 @@ def test_missing_perfume_raises_error() -> None:
         kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
     )
 
-    with pytest.raises(ims.PerfumeNotFoundError):
+    with pytest.raises(PerfumeNotFoundError):
         store.create_collection_item(perfume_id=1, data=test_item)
 
 
@@ -161,7 +161,7 @@ def test_failed_collection_item_creation_does_not_increment_counter() -> None:
         kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
     )
 
-    with pytest.raises(ims.PerfumeNotFoundError):
+    with pytest.raises(PerfumeNotFoundError):
         store.create_collection_item(perfume_id=1, data=test_item)
 
     perf = mdl.PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
@@ -346,5 +346,5 @@ def test_perfume_no_rating() -> None:
 def test_not_exists_perfume() -> None:
     store = ims.InMemoryStore()
 
-    with pytest.raises(ims.PerfumeNotFoundError):
+    with pytest.raises(PerfumeNotFoundError):
         store.get_perfume_details(perfume_id=1)

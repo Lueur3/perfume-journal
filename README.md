@@ -67,7 +67,7 @@ Migration files live in `migrations/versions`. Review generated migrations
 before applying them. Downgrading the initial migration drops the three domain
 tables and their data.
 
-### PostgreSQL perfume creation
+### PostgreSQL perfume operations
 
 `perfume_journal.sqlalchemy_store.create_perfume()` creates a perfume through
 an async session factory and returns its Pydantic representation after a
@@ -76,7 +76,16 @@ function for duplicate detection keys.
 
 Only a unique violation (`23505`) of `uq_brand_name_concentration_keys` is
 translated into `DuplicatePerfumeError`. Other integrity errors propagate
-without that translation. This operation is not yet connected to the HTTP API.
+without that translation.
+
+`perfume_journal.sqlalchemy_store.get_perfume()` opens a session and retrieves
+one perfume by its primary key. It returns a Pydantic `Perfume` containing
+`id`, `brand`, `name`, and `concentration`, or raises the shared
+`PerfumeNotFoundError` if the record does not exist. It does not assemble
+collection items or wearings.
+
+These operations are not yet connected to the HTTP API. The existing GET
+endpoint still returns `PerfumeDetails` from in-memory storage.
 
 ## API
 

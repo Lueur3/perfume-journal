@@ -4,10 +4,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 import perfume_journal.sqlalchemy_store as store
-from perfume_journal.errors import DuplicatePerfumeError
+from perfume_journal.errors import DuplicatePerfumeError, PerfumeNotFoundError
 from perfume_journal.models import PerfumeCreate
 from perfume_journal.orm_models import Perfume as PerfumeRow
-from perfume_journal.sqlalchemy_store import create_perfume
+from perfume_journal.sqlalchemy_store import create_perfume, get_perfume
 
 
 @pytest.mark.anyio
@@ -103,3 +103,32 @@ async def test_create_perfume_preserves_other_integrity_errors(
         row_perfume = result.scalar_one_or_none()
 
         assert row_perfume is None
+
+
+@pytest.mark.anyio
+async def test_correct_read_perfume(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
+    await create_perfume(session_factory, data)
+    data_2 = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT")
+    mdl_perfume_2 = await create_perfume(session_factory, data_2)
+
+    result = await get_perfume(session_factory, mdl_perfume_2.id)
+
+    assert result.id > 0
+    assert result.id == mdl_perfume_2.id
+    assert result.brand == mdl_perfume_2.brand
+    assert result.name == mdl_perfume_2.name
+    assert result.concentration == mdl_perfume_2.concentration
+    assert result.brand == "Tom Ford"
+    assert result.name == "Oud Wood"
+    assert result.concentration == "EDT"
+
+
+@pytest.mark.anyio
+async def test_not_found_perfume_error(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    with pytest.raises(PerfumeNotFoundError):
+        await get_perfume(session_factory, perfume_id=999)

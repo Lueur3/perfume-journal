@@ -1,10 +1,6 @@
 import perfume_journal.models as mdl
-from perfume_journal.errors import DuplicatePerfumeError
+from perfume_journal.errors import DuplicatePerfumeError, PerfumeNotFoundError
 from perfume_journal.normalization import create_key
-
-
-class PerfumeNotFoundError(Exception):
-    pass
 
 
 class CollectionItemNotFoundError(Exception):
