@@ -67,7 +67,7 @@ Migration files live in `migrations/versions`. Review generated migrations
 before applying them. Downgrading the initial migration drops the three domain
 tables and their data.
 
-### PostgreSQL perfume operations
+### PostgreSQL storage operations
 
 `perfume_journal.sqlalchemy_store.create_perfume()` creates a perfume through
 an async session factory and returns its Pydantic representation after a
@@ -83,6 +83,14 @@ one perfume by its primary key. It returns a Pydantic `Perfume` containing
 `id`, `brand`, `name`, and `concentration`, or raises the shared
 `PerfumeNotFoundError` if the record does not exist. It does not assemble
 collection items or wearings.
+
+`perfume_journal.sqlalchemy_store.create_collection_item()` checks that the
+parent perfume exists and inserts a physical sample or bottle in the same
+session and transaction. A missing parent raises `PerfumeNotFoundError`.
+PostgreSQL assigns the item ID and the default `active` status. The operation
+returns a Pydantic `CollectionItem` after a successful commit. Volume and
+acquisition date may be omitted, and identical items are allowed as separate
+physical instances.
 
 These operations are not yet connected to the HTTP API. The existing GET
 endpoint still returns `PerfumeDetails` from in-memory storage.

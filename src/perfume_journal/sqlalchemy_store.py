@@ -68,3 +68,30 @@ async def get_perfume(
             name=result.name,
             concentration=result.concentration,
         )
+
+
+async def create_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+    perfume_id: int,
+    data: mdl.CollectionItemCreate,
+) -> mdl.CollectionItem:
+    async with session_factory.begin() as session:
+        perfume = await session.get(orm.Perfume, perfume_id)
+
+        if perfume is None:
+            raise PerfumeNotFoundError("Perfume not found.")
+
+        orm_collection_item = orm.CollectionItem(
+            perfume_id=perfume_id,
+            kind=data.kind,
+            initial_volume_ml=data.initial_volume_ml,
+            acquired_on=data.acquired_on,
+        )
+        session.add(orm_collection_item)
+        await session.flush()
+
+        mdl_collection_item = mdl.CollectionItem.model_validate(
+            orm_collection_item, from_attributes=True
+        )
+
+    return mdl_collection_item

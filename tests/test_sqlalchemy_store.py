@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -5,9 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 import perfume_journal.sqlalchemy_store as store
 from perfume_journal.errors import DuplicatePerfumeError, PerfumeNotFoundError
-from perfume_journal.models import PerfumeCreate
+from perfume_journal.models import CollectionItemCreate, PerfumeCreate
+from perfume_journal.orm_models import CollectionItem as CollectionItemRow
 from perfume_journal.orm_models import Perfume as PerfumeRow
-from perfume_journal.sqlalchemy_store import create_perfume, get_perfume
+from perfume_journal.sqlalchemy_store import (
+    create_collection_item,
+    create_perfume,
+    get_perfume,
+)
 
 
 @pytest.mark.anyio
@@ -132,3 +139,103 @@ async def test_not_found_perfume_error(
 ) -> None:
     with pytest.raises(PerfumeNotFoundError):
         await get_perfume(session_factory, perfume_id=999)
+
+
+@pytest.mark.anyio
+async def test_create_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=2.0, acquired_on=date(2026, 10, 19)
+    )
+
+    mdl_collection_item = await create_collection_item(
+        session_factory, mdl_perfume.id, data_collection_item
+    )
+
+    assert mdl_collection_item.id > 0
+    assert mdl_collection_item.perfume_id == mdl_perfume.id
+    assert mdl_collection_item.kind == "sample"
+    assert mdl_collection_item.initial_volume_ml == 2.0
+    assert mdl_collection_item.acquired_on == date(2026, 10, 19)
+    assert mdl_collection_item.status == "active"
+
+    async with session_factory() as session:
+        statement = select(CollectionItemRow).where(
+            CollectionItemRow.id == mdl_collection_item.id
+        )
+        result = await session.execute(statement)
+        row_collection_item = result.scalar_one()
+
+        assert row_collection_item.id > 0
+        assert row_collection_item.perfume_id == mdl_perfume.id
+        assert row_collection_item.kind == "sample"
+        assert row_collection_item.initial_volume_ml == 2.0
+        assert row_collection_item.acquired_on == date(2026, 10, 19)
+        assert row_collection_item.status == "active"
+
+
+@pytest.mark.anyio
+async def test_no_perfume_for_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=2.0, acquired_on=date(2026, 10, 19)
+    )
+
+    with pytest.raises(PerfumeNotFoundError):
+        await create_collection_item(
+            session_factory, perfume_id=999, data=data_collection_item
+        )
+
+    async with session_factory() as session:
+        statement = select(CollectionItemRow)
+        query_result = await session.execute(statement)
+        result = query_result.scalar_one_or_none()
+
+        assert result is None
+
+
+@pytest.mark.anyio
+async def test_equal_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(kind="sample")
+    mdl_collection_item_1 = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+    mdl_collection_item_2 = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    assert mdl_collection_item_1.id > 0
+    assert mdl_collection_item_1.perfume_id == mdl_perfume.id
+    assert mdl_collection_item_1.kind == "sample"
+    assert mdl_collection_item_1.initial_volume_ml is None
+    assert mdl_collection_item_1.acquired_on is None
+    assert mdl_collection_item_1.status == "active"
+
+    assert mdl_collection_item_2.id > 0
+    assert mdl_collection_item_2.perfume_id == mdl_perfume.id
+    assert mdl_collection_item_2.kind == "sample"
+    assert mdl_collection_item_2.initial_volume_ml is None
+    assert mdl_collection_item_2.acquired_on is None
+    assert mdl_collection_item_2.status == "active"
+
+    async with session_factory() as session:
+        statement = select(CollectionItemRow)
+        query_result = await session.execute(statement)
+        results = query_result.scalars().all()
+
+        assert len(results) == 2
+        assert mdl_collection_item_1.id != mdl_collection_item_2.id
+        assert {row.id for row in results} == {
+            mdl_collection_item_1.id,
+            mdl_collection_item_2.id,
+        }
