@@ -4,6 +4,7 @@ import pytest
 
 import perfume_journal.in_memory_store as ims
 import perfume_journal.models as mdl
+from perfume_journal.errors import DuplicatePerfumeError
 
 
 def test_creates_first_perfume_with_expected_attributes() -> None:
@@ -43,7 +44,7 @@ def test_duplicate_perfume_raises_error() -> None:
 
     store.create_perfume(perf1)
 
-    with pytest.raises(ims.DuplicatePerfumeError):
+    with pytest.raises(DuplicatePerfumeError):
         store.create_perfume(perf2)
 
 
@@ -55,7 +56,7 @@ def test_normalize_values() -> None:
 
     store.create_perfume(perf1)
 
-    with pytest.raises(ims.DuplicatePerfumeError):
+    with pytest.raises(DuplicatePerfumeError):
         store.create_perfume(perf2)
 
 
@@ -83,7 +84,7 @@ def test_failed_creation_does_not_increment_counter() -> None:
 
     stored_perf1 = store.create_perfume(perf1)
 
-    with pytest.raises(ims.DuplicatePerfumeError):
+    with pytest.raises(DuplicatePerfumeError):
         store.create_perfume(duplicate_perf1)
 
     stored_perf2 = store.create_perfume(perf2)

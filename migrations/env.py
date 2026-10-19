@@ -2,11 +2,11 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import URL, pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from perfume_journal.config import get_database_url
+from perfume_journal.config import get_database_url, get_test_database_url
 from perfume_journal.orm_models import Base
 
 # this is the Alembic Config object, which provides
@@ -39,7 +39,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = get_database_url()
+    url = get_migration_database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -64,7 +64,9 @@ async def run_async_migrations() -> None:
 
     """
 
-    connectable = create_async_engine(url=get_database_url(), poolclass=pool.NullPool)
+    connectable = create_async_engine(
+        url=get_migration_database_url(), poolclass=pool.NullPool
+    )
 
     try:
         async with connectable.connect() as connection:
@@ -77,6 +79,19 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
 
     asyncio.run(run_async_migrations())
+
+
+def get_migration_database_url() -> URL:
+    arguments = context.get_x_argument(as_dictionary=True)
+    environment = arguments.get("environment", "development")
+
+    match environment:
+        case "development":
+            return get_database_url()
+        case "test":
+            return get_test_database_url()
+        case _:
+            raise ValueError("Wrong argument.")
 
 
 if context.is_offline_mode():

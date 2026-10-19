@@ -22,3 +22,17 @@ def get_database_url() -> URL:
     )
 
     return db_url
+
+
+def get_test_database_url() -> URL:
+    db_url = get_database_url()
+    db_test_name = os.environ["PERFUME_TEST_DB_NAME"]
+    if db_test_name == db_url.database or not db_test_name:
+        raise ValueError(
+            f"Invalid test database name: '{db_test_name}'. "
+            f"It cannot be empty or match the main database name ('{db_url.database}')."
+        )
+
+    db_test_url = db_url.set(database=db_test_name)
+
+    return db_test_url

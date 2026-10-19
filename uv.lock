@@ -572,6 +572,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "alembic" },
+    { name = "anyio" },
     { name = "httpx2" },
     { name = "mypy" },
     { name = "pytest" },
@@ -591,6 +592,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "alembic", specifier = ">=1.20.0" },
+    { name = "anyio", specifier = ">=4.15.1" },
     { name = "httpx2", specifier = ">=2.13.1" },
     { name = "mypy", specifier = ">=2.3.1" },
     { name = "pytest", specifier = ">=9.1.1" },

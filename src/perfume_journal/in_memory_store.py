@@ -1,8 +1,6 @@
 import perfume_journal.models as mdl
-
-
-class DuplicatePerfumeError(Exception):
-    pass
+from perfume_journal.errors import DuplicatePerfumeError
+from perfume_journal.normalization import create_key
 
 
 class PerfumeNotFoundError(Exception):
@@ -23,23 +21,16 @@ class InMemoryStore:
         self._next_collection_item_id: int = 1
         self._next_wearing_id: int = 1
 
-    def _normalize_string(self, value: str | None) -> str | None:
-        if value is None:
-            return None
-
-        return " ".join(value.split()).casefold()
-
     def create_perfume(self, data: mdl.PerfumeCreate) -> mdl.Perfume:
-        normalized_brand = self._normalize_string(data.brand)
-        normalized_name = self._normalize_string(data.name)
-        normalized_concentration = self._normalize_string(data.concentration)
+        normalized_brand = create_key(data.brand)
+        normalized_name = create_key(data.name)
+        normalized_concentration = create_key(data.concentration)
 
         for perfume in self._perfumes.values():
             if (
-                self._normalize_string(perfume.brand) == normalized_brand
-                and self._normalize_string(perfume.name) == normalized_name
-                and self._normalize_string(perfume.concentration)
-                == normalized_concentration
+                create_key(perfume.brand) == normalized_brand
+                and create_key(perfume.name) == normalized_name
+                and create_key(perfume.concentration) == normalized_concentration
             ):
                 raise DuplicatePerfumeError("This perfume already exists.")
 

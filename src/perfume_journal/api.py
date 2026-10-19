@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, status
 
 import perfume_journal.in_memory_store as ims
 import perfume_journal.models as mdl
+from perfume_journal.errors import DuplicatePerfumeError
 
 _store = ims.InMemoryStore()
 
@@ -12,7 +13,7 @@ app = FastAPI(title="Perfume Journal")
 def create_perfume(body: mdl.PerfumeCreate) -> mdl.Perfume:
     try:
         return _store.create_perfume(body)
-    except ims.DuplicatePerfumeError as exc:
+    except DuplicatePerfumeError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
         ) from exc

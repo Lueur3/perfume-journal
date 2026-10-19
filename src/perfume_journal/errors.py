@@ -1,0 +1,2 @@
+class DuplicatePerfumeError(Exception):
+    pass

@@ -12,6 +12,7 @@ the application restarts.
 
 - Python 3.14
 - [uv](https://docs.astral.sh/uv/)
+- PostgreSQL 18 for database operations and integration tests
 
 ## Install
 
@@ -65,6 +66,17 @@ Alembic tracks the applied revision in its own `alembic_version` table.
 Migration files live in `migrations/versions`. Review generated migrations
 before applying them. Downgrading the initial migration drops the three domain
 tables and their data.
+
+### PostgreSQL perfume creation
+
+`perfume_journal.sqlalchemy_store.create_perfume()` creates a perfume through
+an async session factory and returns its Pydantic representation after a
+successful commit. Both storage implementations use the same normalization
+function for duplicate detection keys.
+
+Only a unique violation (`23505`) of `uq_brand_name_concentration_keys` is
+translated into `DuplicatePerfumeError`. Other integrity errors propagate
+without that translation. This operation is not yet connected to the HTTP API.
 
 ## API
 
@@ -146,6 +158,41 @@ Responses:
 
 - `200 OK` — the assembled perfume details were returned;
 - `404 Not Found` — the referenced perfume does not exist.
+
+## Database tests
+
+The full test suite requires a running PostgreSQL server and a separate,
+migrated test database. Create an empty database named `perfume_journal_test`
+on the same server, accessible by the role configured in `.env`. Set:
+
+```dotenv
+PERFUME_TEST_DB_NAME=perfume_journal_test
+```
+
+Keep `PERFUME_DB_NAME` pointed at the development database. An empty test
+database name or one equal to the development database name is rejected.
+
+Apply the existing migrations to the test database:
+
+```powershell
+uv run alembic -x environment=test upgrade head
+uv run alembic -x environment=test current
+```
+
+Without `-x environment=test`, Alembic continues to use the development
+database. Unknown `environment` values are rejected.
+
+Database tests use AnyIO with the asyncio backend. For each store test, the
+session factory is bound to one connection inside an external transaction,
+with sessions using savepoints. The external transaction is rolled back after
+the test, including changes committed by the operation under test. PostgreSQL
+sequence values are not reset by this rollback.
+
+Run just the database tests:
+
+```powershell
+uv run pytest tests/test_sqlalchemy_store.py -q
+```
 
 ## Development checks
 
