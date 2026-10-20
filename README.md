@@ -92,6 +92,13 @@ returns a Pydantic `CollectionItem` after a successful commit. Volume and
 acquisition date may be omitted, and identical items are allowed as separate
 physical instances.
 
+`perfume_journal.sqlalchemy_store.create_wearing()` checks that the parent
+collection item exists and inserts a wearing in the same session and
+transaction. A missing parent raises the shared `CollectionItemNotFoundError`.
+It returns a Pydantic `Wearing` after a successful commit. The supplied wearing
+time is preserved as an instant; rating and comment may be omitted. Repeated
+wearings with identical data are allowed and receive separate IDs.
+
 These operations are not yet connected to the HTTP API. The existing GET
 endpoint still returns `PerfumeDetails` from in-memory storage.
 

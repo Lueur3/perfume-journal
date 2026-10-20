@@ -4,7 +4,11 @@ import pytest
 
 import perfume_journal.in_memory_store as ims
 import perfume_journal.models as mdl
-from perfume_journal.errors import DuplicatePerfumeError, PerfumeNotFoundError
+from perfume_journal.errors import (
+    CollectionItemNotFoundError,
+    DuplicatePerfumeError,
+    PerfumeNotFoundError,
+)
 
 
 def test_creates_first_perfume_with_expected_attributes() -> None:
@@ -211,7 +215,7 @@ def test_missing_collection_item_raises_error() -> None:
         {"worn_at": "2026-10-02T09:30:00+03:00"}
     )
 
-    with pytest.raises(ims.CollectionItemNotFoundError):
+    with pytest.raises(CollectionItemNotFoundError):
         store.create_wearing(collection_item_id=1, data=test_wearing)
 
 
@@ -256,7 +260,7 @@ def test_failed_wearing_creation_does_not_increment_counter() -> None:
         {"worn_at": "2026-10-02T09:30:00+03:00"}
     )
 
-    with pytest.raises(ims.CollectionItemNotFoundError):
+    with pytest.raises(CollectionItemNotFoundError):
         store.create_wearing(collection_item_id=1, data=test_wearing)
 
     perf = mdl.PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")

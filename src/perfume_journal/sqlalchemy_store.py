@@ -3,7 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import perfume_journal.models as mdl
 import perfume_journal.orm_models as orm
-from perfume_journal.errors import DuplicatePerfumeError, PerfumeNotFoundError
+from perfume_journal.errors import (
+    CollectionItemNotFoundError,
+    DuplicatePerfumeError,
+    PerfumeNotFoundError,
+)
 from perfume_journal.normalization import create_key
 
 
@@ -95,3 +99,29 @@ async def create_collection_item(
         )
 
     return mdl_collection_item
+
+
+async def create_wearing(
+    session_factory: async_sessionmaker[AsyncSession],
+    collection_item_id: int,
+    data: mdl.WearingCreate,
+) -> mdl.Wearing:
+    async with session_factory.begin() as session:
+        collection_item = await session.get(orm.CollectionItem, collection_item_id)
+
+        if collection_item is None:
+            raise CollectionItemNotFoundError("Collection item not found.")
+
+        orm_wearing = orm.Wearing(
+            collection_item_id=collection_item_id,
+            worn_at=data.worn_at,
+            rating=data.rating,
+            comment=data.comment,
+        )
+
+        session.add(orm_wearing)
+        await session.flush()
+
+        mdl_wearing = mdl.Wearing.model_validate(orm_wearing, from_attributes=True)
+
+    return mdl_wearing

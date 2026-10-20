@@ -4,3 +4,7 @@ class DuplicatePerfumeError(Exception):
 
 class PerfumeNotFoundError(Exception):
     pass
+
+
+class CollectionItemNotFoundError(Exception):
+    pass
