@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -125,3 +126,59 @@ async def create_wearing(
         mdl_wearing = mdl.Wearing.model_validate(orm_wearing, from_attributes=True)
 
     return mdl_wearing
+
+
+async def get_perfume_details(
+    session_factory: async_sessionmaker[AsyncSession],
+    perfume_id: int,
+) -> mdl.PerfumeDetails:
+
+    async with session_factory() as session:
+        orm_perfume = await session.get(orm.Perfume, perfume_id)
+        if orm_perfume is None:
+            raise PerfumeNotFoundError("Perfume not found.")
+
+        statement_collection_item = select(orm.CollectionItem).where(
+            orm.CollectionItem.perfume_id == perfume_id
+        )
+        result_collection_item_query = await session.execute(statement_collection_item)
+        orm_collection_items = result_collection_item_query.scalars().all()
+
+        collection_items_id = [item.id for item in orm_collection_items]
+
+        statement_wering = select(orm.Wearing).where(
+            orm.Wearing.collection_item_id.in_(collection_items_id)
+        )
+        result_wearing_query = await session.execute(statement_wering)
+        orm_wearings = result_wearing_query.scalars().all()
+
+    collection_items_details_list = []
+
+    for item in orm_collection_items:
+        wearing_list = []
+        for wearing in orm_wearings:
+            if wearing.collection_item_id == item.id:
+                mdl_wearing = mdl.Wearing.model_validate(wearing, from_attributes=True)
+                wearing_list.append(mdl_wearing)
+
+        mdl_item = mdl.CollectionItem.model_validate(item, from_attributes=True)
+        collection_items_details = mdl.CollectionItemDetails(
+            **mdl_item.model_dump(), wearings=wearing_list
+        )
+        collection_items_details_list.append(collection_items_details)
+
+    ratings = [
+        wearing.rating
+        for item in collection_items_details_list
+        for wearing in item.wearings
+        if wearing.rating is not None
+    ]
+    average_rating = sum(ratings) / len(ratings) if ratings else None
+
+    mdl_perfume = mdl.Perfume.model_validate(orm_perfume, from_attributes=True)
+
+    return mdl.PerfumeDetails(
+        **mdl_perfume.model_dump(),
+        collection_items=collection_items_details_list,
+        average_rating=average_rating,
+    )

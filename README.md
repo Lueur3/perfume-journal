@@ -99,6 +99,15 @@ It returns a Pydantic `Wearing` after a successful commit. The supplied wearing
 time is preserved as an instant; rating and comment may be omitted. Repeated
 wearings with identical data are allowed and receive separate IDs.
 
+`perfume_journal.sqlalchemy_store.get_perfume_details()` returns a Pydantic
+`PerfumeDetails` with the perfume's collection items, each item's wearing
+history, and the average of all specified wearing ratings. It reads the
+perfume, its items, and their wearings in three queries within one session.
+A missing perfume raises `PerfumeNotFoundError`. Empty histories remain empty
+lists; unrated wearings remain in the history, and the average is `None` when
+no wearing has a rating. Items and wearings belonging to other perfumes are
+excluded. Collection order is not guaranteed.
+
 These operations are not yet connected to the HTTP API. The existing GET
 endpoint still returns `PerfumeDetails` from in-memory storage.
 
