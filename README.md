@@ -2,17 +2,17 @@
 
 Personal perfume collection tracker and journal.
 
-The project currently provides in-memory API slices for creating perfume
-records, adding physical samples or bottles to them, and recording wearings
-for those collection items. A perfume can be retrieved with its collection
-items, wearing history, and calculated average rating. Stored data is lost when
-the application restarts.
+The project provides a PostgreSQL-backed API for creating perfume records,
+adding physical samples or bottles to them, and recording wearings for those
+collection items. A perfume can be retrieved with its collection items,
+wearing history, and calculated average rating. Committed data remains
+available after the application restarts.
 
 ## Requirements
 
 - Python 3.14
 - [uv](https://docs.astral.sh/uv/)
-- PostgreSQL 18 for database operations and integration tests
+- PostgreSQL 18 for the API and integration tests
 
 ## Install
 
@@ -21,6 +21,9 @@ uv sync
 ```
 
 ## Run
+
+Configure the development database and apply migrations as described below
+before starting the server.
 
 ```powershell
 uv run uvicorn perfume_journal.api:app --reload
@@ -32,8 +35,7 @@ the OpenAPI schema is available at <http://127.0.0.1:8000/openapi.json>.
 ## PostgreSQL setup and migrations
 
 SQLAlchemy ORM models and the initial Alembic migration describe the
-`perfumes`, `collection_items`, and `wearings` tables. The API still uses
-in-memory storage; creating these tables does not switch its storage backend.
+`perfumes`, `collection_items`, and `wearings` tables used by the API.
 
 Create an empty PostgreSQL database named `perfume_journal`. Copy
 `.env.example` to `.env` in the project root and fill in your local connection
@@ -71,8 +73,8 @@ tables and their data.
 
 `perfume_journal.sqlalchemy_store.create_perfume()` creates a perfume through
 an async session factory and returns its Pydantic representation after a
-successful commit. Both storage implementations use the same normalization
-function for duplicate detection keys.
+successful commit. The shared normalization function produces duplicate
+detection keys.
 
 Only a unique violation (`23505`) of `uq_brand_name_concentration_keys` is
 translated into `DuplicatePerfumeError`. Other integrity errors propagate
@@ -108,8 +110,11 @@ lists; unrated wearings remain in the history, and the average is `None` when
 no wearing has a rating. Items and wearings belonging to other perfumes are
 excluded. Collection order is not guaranteed.
 
-These operations are not yet connected to the HTTP API. The existing GET
-endpoint still returns `PerfumeDetails` from in-memory storage.
+The HTTP handlers await the corresponding SQLAlchemy operations. The GET
+endpoint calls `get_perfume_details()` to preserve the nested response contract.
+FastAPI's lifespan creates the async engine and session factory at startup and
+disposes the engine at shutdown. A dependency retrieves the factory from
+`app.state`; each storage operation opens and closes its own session.
 
 ## API
 
@@ -220,6 +225,14 @@ session factory is bound to one connection inside an external transaction,
 with sessions using savepoints. The external transaction is rolled back after
 the test, including changes committed by the operation under test. PostgreSQL
 sequence values are not reset by this rollback.
+
+API tests use HTTPX2's `AsyncClient` and `ASGITransport` with AnyIO. They
+override `get_session_factory()` with the same isolated test factory using
+`monkeypatch.setitem()` on `app.dependency_overrides`. The transport does not
+start the application's lifespan; the database fixtures provide its resources.
+API requests exercise real PostgreSQL operations, and their changes are
+rolled back after each test. IDs are compared using values returned by the
+API, and wearing timestamps are compared as timezone-aware instants.
 
 Run just the database tests:
 

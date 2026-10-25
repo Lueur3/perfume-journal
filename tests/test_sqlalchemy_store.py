@@ -70,11 +70,11 @@ async def test_duplicate_perfume(
     concentration: str | None,
     expected_concentration_key: str | None,
 ) -> None:
-    data = PerfumeCreate(brand="Creed", name="Aventus", concentration=concentration)
+    data = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration=concentration)
     mdl_perfume = await create_perfume(session_factory, data)
 
     duplicate_data = PerfumeCreate(
-        brand="CREED", name="aventus", concentration=concentration
+        brand="tom   ford", name="OUD  WOOD", concentration=concentration
     )
     with pytest.raises(DuplicatePerfumeError):
         await create_perfume(session_factory, duplicate_data)
@@ -89,10 +89,32 @@ async def test_duplicate_perfume(
         assert row_perfume.name == mdl_perfume.name
         assert row_perfume.concentration == concentration
         assert row_perfume.concentration_key == expected_concentration_key
-        assert row_perfume.brand == "Creed"
-        assert row_perfume.name == "Aventus"
-        assert row_perfume.brand_key == "creed"
-        assert row_perfume.name_key == "aventus"
+        assert row_perfume.brand == "Tom Ford"
+        assert row_perfume.name == "Oud Wood"
+        assert row_perfume.brand_key == "tom ford"
+        assert row_perfume.name_key == "oud wood"
+
+
+@pytest.mark.anyio
+async def test_diff_concentrations(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume_1 = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    perfume_1 = await create_perfume(session_factory, data_perfume_1)
+
+    data_perfume_2 = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
+    perfume_2 = await create_perfume(session_factory, data_perfume_2)
+
+    assert perfume_1.id != perfume_2.id
+
+    async with session_factory() as session:
+        statement = select(PerfumeRow)
+        result_query = await session.execute(statement)
+        results = result_query.scalars().all()
+
+    assert len(results) == 2
+    assert {row.id for row in results} == {perfume_1.id, perfume_2.id}
+    assert {row.concentration for row in results} == {"EDT", "EDP"}
 
 
 @pytest.mark.anyio
