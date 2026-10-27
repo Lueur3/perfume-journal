@@ -6,7 +6,8 @@ The project provides a PostgreSQL-backed API for creating perfume records,
 adding physical samples or bottles to them, and recording wearings for those
 collection items. A perfume can be retrieved with its collection items,
 wearing history, and calculated average rating. Committed data remains
-available after the application restarts.
+available after the application restarts. Existing perfume records can be
+updated without changing their IDs.
 
 ## Requirements
 
@@ -80,6 +81,12 @@ Only a unique violation (`23505`) of `uq_brand_name_concentration_keys` is
 translated into `DuplicatePerfumeError`. Other integrity errors propagate
 without that translation.
 
+`perfume_journal.sqlalchemy_store.update_perfume()` loads an existing perfume
+and replaces its brand, name, concentration, and normalized keys in one
+transaction. A missing record raises `PerfumeNotFoundError`. A uniqueness
+conflict raises `DuplicatePerfumeError`, and the transaction is rolled back.
+The operation returns the updated Pydantic `Perfume` after a successful commit.
+
 `perfume_journal.sqlalchemy_store.get_perfume()` opens a session and retrieves
 one perfume by its primary key. It returns a Pydantic `Perfume` containing
 `id`, `brand`, `name`, and `concentration`, or raises the shared
@@ -138,6 +145,21 @@ Responses:
 - `201 Created` — the perfume was created;
 - `409 Conflict` — a perfume with the same normalized brand, name, and
   concentration already exists;
+- `422 Unprocessable Content` — the request body is invalid.
+
+### `PUT /perfumes/{perfume_id}`
+
+Replaces the editable fields of an existing perfume. `brand` and `name` are
+required; `concentration` may be omitted or set to `null`, both of which clear
+its previous value. Validation and normalization follow the creation rules.
+The response contains the updated fields and the original `id`.
+
+Responses:
+
+- `200 OK` — the perfume was updated;
+- `404 Not Found` — the perfume does not exist;
+- `409 Conflict` — the replacement values conflict with another perfume's
+  normalized brand, name, and concentration; existing data is preserved;
 - `422 Unprocessable Content` — the request body is invalid.
 
 ### `POST /perfumes/{perfume_id}/collection-items`

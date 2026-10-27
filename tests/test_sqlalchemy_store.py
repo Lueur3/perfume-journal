@@ -21,6 +21,7 @@ from perfume_journal.sqlalchemy_store import (
     create_wearing,
     get_perfume,
     get_perfume_details,
+    update_perfume,
 )
 
 
@@ -597,3 +598,87 @@ async def test_perfume_details_isolation(
     assert len(item.wearings) == 1
     assert item.wearings[0].id == mdl_wearing_2.id
     assert item.wearings[0].rating == 9
+
+
+@pytest.mark.anyio
+async def test_correct_perfume_update(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    new_data = PerfumeCreate(brand="Tom Ford", name="Oud Wood")
+    new_mdl_perfume = await update_perfume(session_factory, mdl_perfume.id, new_data)
+
+    assert new_mdl_perfume.id == mdl_perfume.id
+    assert new_mdl_perfume.brand == "Tom Ford"
+    assert new_mdl_perfume.name == "Oud Wood"
+    assert new_mdl_perfume.concentration is None
+
+    async with session_factory() as session:
+        stmt = select(PerfumeRow).where(PerfumeRow.id == mdl_perfume.id)
+        res_query = await session.execute(stmt)
+        result = res_query.scalar_one()
+
+        assert result.brand == "Tom Ford"
+        assert result.name == "Oud Wood"
+        assert result.concentration is None
+        assert result.brand_key == "tom ford"
+        assert result.name_key == "oud wood"
+        assert result.concentration_key is None
+
+
+@pytest.mark.anyio
+async def test_conflict_perfume_update(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume_1 = PerfumeCreate(brand="Tom Ford", name="Oud Wood")
+    data_perfume_2 = PerfumeCreate(brand="Creed", name="Aventus")
+    mdl_perfume_1 = await create_perfume(session_factory, data_perfume_1)
+    mdl_perfume_2 = await create_perfume(session_factory, data_perfume_2)
+
+    duplicate_data = PerfumeCreate(brand="tom  ford", name="oud   wood")
+
+    with pytest.raises(DuplicatePerfumeError):
+        await update_perfume(session_factory, mdl_perfume_2.id, duplicate_data)
+
+    async with session_factory() as session:
+        stmt = select(PerfumeRow)
+        res_query = await session.execute(stmt)
+        results = res_query.scalars().all()
+
+        assert {item.id for item in results} == {mdl_perfume_1.id, mdl_perfume_2.id}
+        by_id = {row.id: row for row in results}
+
+        row_1 = by_id[mdl_perfume_1.id]
+        assert row_1.brand == "Tom Ford"
+        assert row_1.name == "Oud Wood"
+        assert row_1.concentration is None
+        assert row_1.brand_key == "tom ford"
+        assert row_1.name_key == "oud wood"
+        assert row_1.concentration_key is None
+
+        row_2 = by_id[mdl_perfume_2.id]
+        assert row_2.brand == "Creed"
+        assert row_2.name == "Aventus"
+        assert row_2.concentration is None
+        assert row_2.brand_key == "creed"
+        assert row_2.name_key == "aventus"
+        assert row_2.concentration_key is None
+
+
+@pytest.mark.anyio
+async def test_empty_perfume_update(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+
+    with pytest.raises(PerfumeNotFoundError):
+        await update_perfume(session_factory, perfume_id=999, data=data_perfume)
+
+    async with session_factory() as session:
+        stmt = select(PerfumeRow)
+        res_query = await session.execute(stmt)
+        result = res_query.scalar_one_or_none()
+
+        assert result is None

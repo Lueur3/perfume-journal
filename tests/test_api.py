@@ -262,3 +262,90 @@ async def test_not_found_perfume(async_client: AsyncClient) -> None:
 
     assert response.status_code == 404
     assert detail == "Perfume not found."
+
+
+@pytest.mark.anyio
+async def test_correct_perfume_update(async_client: AsyncClient) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes", json={"brand": "Creed", "name": "Aventus", "concentration": "edp"}
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    response = await async_client.put(
+        f"/perfumes/{perfume_id}",
+        json={"brand": "Tom Ford", "name": "Oud Wood", "concentration": "edt"},
+    )
+    item = response.json()
+
+    assert response.status_code == 200
+    assert item["id"] == perfume_id
+    assert item["brand"] == "Tom Ford"
+    assert item["name"] == "Oud Wood"
+    assert item["concentration"] == "EDT"
+
+    response_get = await async_client.get(f"/perfumes/{perfume_id}")
+    item_get = response_get.json()
+
+    assert response_get.status_code == 200
+    assert item_get["id"] == perfume_id
+    assert item_get["brand"] == "Tom Ford"
+    assert item_get["name"] == "Oud Wood"
+    assert item_get["concentration"] == "EDT"
+
+
+@pytest.mark.anyio
+async def test_not_exsists_perfume_update(async_client: AsyncClient) -> None:
+    response = await async_client.put(
+        "/perfumes/1",
+        json={"brand": "Tom Ford", "name": "Oud Wood", "concentration": "edt"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Perfume not found."
+
+
+@pytest.mark.anyio
+async def test_duplicate_perfume_update(async_client: AsyncClient) -> None:
+    await async_client.post(
+        "/perfumes", json={"brand": "Creed", "name": "Aventus", "concentration": "edp"}
+    )
+
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Tom Ford", "name": "Oud Wood", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    response = await async_client.put(
+        f"/perfumes/{perfume_id}",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edp"},
+    )
+
+    detail = response.json()["detail"]
+    assert response.status_code == 409
+    assert detail == "This perfume already exists."
+
+
+@pytest.mark.anyio
+async def test_wrong_data_perfume_update(async_client: AsyncClient) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Tom Ford", "name": "Oud Wood", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    response = await async_client.put(
+        f"/perfumes/{perfume_id}",
+        json={"brand": "  ", "name": "Aventus", "concentration": "edp"},
+    )
+
+    assert response.status_code == 422
+
+    response_get = await async_client.get(f"/perfumes/{perfume_id}")
+    item_get = response_get.json()
+
+    assert response_get.status_code == 200
+    assert item_get["id"] == perfume_id
+    assert item_get["brand"] == "Tom Ford"
+    assert item_get["name"] == "Oud Wood"
+    assert item_get["concentration"] == "EDT"

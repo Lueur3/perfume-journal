@@ -109,3 +109,27 @@ async def get_perfume(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+
+
+@app.put(
+    "/perfumes/{perfume_id}",
+    response_model=mdl.Perfume,
+    status_code=status.HTTP_200_OK,
+)
+async def update_perfume(
+    perfume_id: int,
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+    body: mdl.PerfumeCreate,
+) -> mdl.Perfume:
+    try:
+        return await sql_store.update_perfume(session_factory, perfume_id, body)
+    except PerfumeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except DuplicatePerfumeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc

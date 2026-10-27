@@ -182,3 +182,40 @@ async def get_perfume_details(
         collection_items=collection_items_details_list,
         average_rating=average_rating,
     )
+
+
+async def update_perfume(
+    session_factory: async_sessionmaker[AsyncSession],
+    perfume_id: int,
+    data: mdl.PerfumeCreate,
+) -> mdl.Perfume:
+    try:
+        async with session_factory.begin() as session:
+            perfume = await session.get(orm.Perfume, perfume_id)
+
+            if perfume is None:
+                raise PerfumeNotFoundError("Perfume not found.")
+
+            for field in ("brand", "name", "concentration"):
+                value = getattr(data, field)
+                setattr(perfume, field, value)
+                setattr(perfume, f"{field}_key", create_key(value))
+
+            await session.flush()
+
+            result = mdl.Perfume.model_validate(perfume, from_attributes=True)
+
+        return result
+
+    except IntegrityError as exc:
+        driver_error = exc.driver_exception
+        sqlstate = getattr(driver_error, "sqlstate", None)
+        constraint_name = getattr(driver_error, "constraint_name", None)
+
+        if (
+            sqlstate == "23505"
+            and constraint_name == "uq_brand_name_concentration_keys"
+        ):
+            raise DuplicatePerfumeError("This perfume already exists.") from exc
+        else:
+            raise
