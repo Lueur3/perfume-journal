@@ -219,3 +219,14 @@ async def update_perfume(
             raise DuplicatePerfumeError("This perfume already exists.") from exc
         else:
             raise
+
+
+async def list_perfumes(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> list[mdl.Perfume]:
+    async with session_factory() as session:
+        results = await session.scalars(select(orm.Perfume).order_by(orm.Perfume.id))
+
+        return [
+            mdl.Perfume.model_validate(item, from_attributes=True) for item in results
+        ]

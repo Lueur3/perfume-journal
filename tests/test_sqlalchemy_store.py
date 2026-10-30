@@ -21,6 +21,7 @@ from perfume_journal.sqlalchemy_store import (
     create_wearing,
     get_perfume,
     get_perfume_details,
+    list_perfumes,
     update_perfume,
 )
 
@@ -682,3 +683,39 @@ async def test_empty_perfume_update(
         result = res_query.scalar_one_or_none()
 
         assert result is None
+
+
+@pytest.mark.anyio
+async def test_empty_list_perfumes(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    result = await list_perfumes(session_factory)
+
+    assert result == []
+
+
+@pytest.mark.anyio
+async def test_correct_list_perfumes(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume_1 = PerfumeCreate(
+        brand="Tom Ford", name="Oud Wood", concentration="EDT"
+    )
+    data_perfume_2 = PerfumeCreate(brand="Creed", name="Aventus")
+    mdl_perfume_1 = await create_perfume(session_factory, data_perfume_1)
+    mdl_perfume_2 = await create_perfume(session_factory, data_perfume_2)
+
+    results = await list_perfumes(session_factory)
+
+    assert len(results) == 2
+
+    items_by_id = {item.id: item for item in results}
+    assert items_by_id == {
+        mdl_perfume_1.id: mdl_perfume_1,
+        mdl_perfume_2.id: mdl_perfume_2,
+    }
+
+    assert [item.id for item in results] == [
+        mdl_perfume_1.id,
+        mdl_perfume_2.id,
+    ]

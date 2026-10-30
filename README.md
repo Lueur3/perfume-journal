@@ -7,7 +7,8 @@ adding physical samples or bottles to them, and recording wearings for those
 collection items. A perfume can be retrieved with its collection items,
 wearing history, and calculated average rating. Committed data remains
 available after the application restarts. Existing perfume records can be
-updated without changing their IDs.
+updated without changing their IDs. All perfume records can also be listed
+with their basic fields and IDs.
 
 ## Requirements
 
@@ -93,6 +94,10 @@ one perfume by its primary key. It returns a Pydantic `Perfume` containing
 `PerfumeNotFoundError` if the record does not exist. It does not assemble
 collection items or wearings.
 
+`perfume_journal.sqlalchemy_store.list_perfumes()` returns all perfumes as
+Pydantic `Perfume` models ordered by ascending ID, including perfumes without
+collection items. An empty table produces an empty list.
+
 `perfume_journal.sqlalchemy_store.create_collection_item()` checks that the
 parent perfume exists and inserts a physical sample or bottle in the same
 session and transaction. A missing parent raises `PerfumeNotFoundError`.
@@ -117,8 +122,9 @@ lists; unrated wearings remain in the history, and the average is `None` when
 no wearing has a rating. Items and wearings belonging to other perfumes are
 excluded. Collection order is not guaranteed.
 
-The HTTP handlers await the corresponding SQLAlchemy operations. The GET
-endpoint calls `get_perfume_details()` to preserve the nested response contract.
+The HTTP handlers await the corresponding SQLAlchemy operations.
+`GET /perfumes/{perfume_id}` calls `get_perfume_details()` to preserve the nested
+response contract; `GET /perfumes` calls `list_perfumes()` for the basic list.
 FastAPI's lifespan creates the async engine and session factory at startup and
 disposes the engine at shutdown. A dependency retrieves the factory from
 `app.state`; each storage operation opens and closes its own session.
@@ -206,6 +212,15 @@ Responses:
 - `201 Created` — the wearing was created;
 - `404 Not Found` — the referenced collection item does not exist;
 - `422 Unprocessable Content` — the request body is invalid.
+
+### `GET /perfumes`
+
+Returns all perfume records ordered by ascending `id`. Each record contains
+`id`, `brand`, `name`, and `concentration`; collection items, wearings, and the
+average rating are available through the details endpoint instead. Perfumes
+without collection items are included.
+
+The response is `200 OK` with a JSON array, or `[]` when no perfumes exist.
 
 ### `GET /perfumes/{perfume_id}`
 

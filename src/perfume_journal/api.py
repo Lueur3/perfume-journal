@@ -133,3 +133,12 @@ async def update_perfume(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
         ) from exc
+
+
+@app.get("/perfumes", response_model=list[mdl.Perfume], status_code=status.HTTP_200_OK)
+async def list_perfumes(
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+) -> list[mdl.Perfume]:
+    return await sql_store.list_perfumes(session_factory)

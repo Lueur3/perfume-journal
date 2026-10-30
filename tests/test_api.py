@@ -349,3 +349,35 @@ async def test_wrong_data_perfume_update(async_client: AsyncClient) -> None:
     assert item_get["brand"] == "Tom Ford"
     assert item_get["name"] == "Oud Wood"
     assert item_get["concentration"] == "EDT"
+
+
+@pytest.mark.anyio
+async def test_empty_list_perfumes(async_client: AsyncClient) -> None:
+    results = await async_client.get("/perfumes")
+
+    assert results.status_code == 200
+    assert results.json() == []
+
+
+@pytest.mark.anyio
+async def test_correct_list_perfumes(async_client: AsyncClient) -> None:
+    perfume_response_1 = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_response_2 = await async_client.post(
+        "/perfumes",
+        json={"brand": "Tom Ford", "name": "Oud Wood"},
+    )
+
+    perfume_1 = perfume_response_1.json()
+    perfume_2 = perfume_response_2.json()
+
+    results = await async_client.get("/perfumes")
+
+    assert results.status_code == 200
+    data = results.json()
+
+    items_by_id = {item["id"]: item for item in data}
+    assert items_by_id == {perfume_1["id"]: perfume_1, perfume_2["id"]: perfume_2}
+    assert data == [perfume_1, perfume_2]
