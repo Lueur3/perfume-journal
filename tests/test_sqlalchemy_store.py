@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 import perfume_journal.sqlalchemy_store as store
 from perfume_journal.errors import (
     CollectionItemArchivedError,
+    CollectionItemHasWearingsError,
     CollectionItemNotFoundError,
     DuplicatePerfumeError,
     PerfumeNotFoundError,
@@ -20,6 +21,7 @@ from perfume_journal.sqlalchemy_store import (
     create_collection_item,
     create_perfume,
     create_wearing,
+    delete_collection_item,
     get_perfume,
     get_perfume_details,
     list_collection_items,
@@ -892,3 +894,94 @@ async def test_correct_list_collection_items(
 
     archived_items_list = await list_collection_items(session_factory, "archived")
     assert archived_items_list == [archived_item]
+
+
+@pytest.mark.anyio
+async def test_correct_delete_active_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    await delete_collection_item(session_factory, mdl_collection_item.id)
+
+    async with session_factory() as session:
+        res = await session.scalars(select(CollectionItemRow))
+        assert res.all() == []
+
+        perfume = await session.get(PerfumeRow, mdl_perfume.id)
+        assert perfume is not None
+
+
+@pytest.mark.anyio
+async def test_correct_delete_archived_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    archived_item = await set_collection_item_status(
+        session_factory, mdl_collection_item.id, "archived"
+    )
+
+    await delete_collection_item(session_factory, archived_item.id)
+
+    async with session_factory() as session:
+        res = await session.scalars(select(CollectionItemRow))
+        assert res.all() == []
+
+        perfume = await session.get(PerfumeRow, mdl_perfume.id)
+        assert perfume is not None
+
+
+@pytest.mark.anyio
+async def test_delete_not_found_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    with pytest.raises(CollectionItemNotFoundError):
+        await delete_collection_item(session_factory, collection_item_id=999)
+
+
+@pytest.mark.anyio
+async def test_failed_delete_collection_item_with_wearings(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    data_wearing = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-10-02T15:00:00+03:00"),
+        rating=9,
+    )
+    mdl_wearing = await create_wearing(
+        session_factory, mdl_collection_item.id, data_wearing
+    )
+
+    with pytest.raises(CollectionItemHasWearingsError):
+        await delete_collection_item(session_factory, mdl_collection_item.id)
+
+    details = await get_perfume_details(session_factory, mdl_perfume.id)
+
+    assert details.collection_items[0].id == mdl_collection_item.id
+    assert details.collection_items[0].wearings == [mdl_wearing]

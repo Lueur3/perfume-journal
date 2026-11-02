@@ -6,6 +6,7 @@ import perfume_journal.models as mdl
 import perfume_journal.orm_models as orm
 from perfume_journal.errors import (
     CollectionItemArchivedError,
+    CollectionItemHasWearingsError,
     CollectionItemNotFoundError,
     DuplicatePerfumeError,
     PerfumeNotFoundError,
@@ -272,3 +273,33 @@ async def list_collection_items(
             mdl.CollectionItem.model_validate(item, from_attributes=True)
             for item in results
         ]
+
+
+async def delete_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+    collection_item_id: int,
+) -> None:
+    try:
+        async with session_factory.begin() as session:
+            collection_item = await session.get(orm.CollectionItem, collection_item_id)
+
+            if collection_item is None:
+                raise CollectionItemNotFoundError("Collection item not found.")
+
+            await session.delete(collection_item)
+            await session.flush()
+
+    except IntegrityError as exc:
+        driver_error = exc.driver_exception
+        sqlstate = getattr(driver_error, "sqlstate", None)
+        constraint_name = getattr(driver_error, "constraint_name", None)
+
+        if (
+            sqlstate == "23001"
+            and constraint_name == "wearings_collection_item_id_fkey"
+        ):
+            raise CollectionItemHasWearingsError(
+                "Cannot delete a collection item with wearing history."
+            ) from exc
+        else:
+            raise

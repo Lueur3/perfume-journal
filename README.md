@@ -12,6 +12,7 @@ with their basic fields and IDs.
 Physical collection items can be archived and restored without losing their
 wearing history. Archived items cannot receive new wearings.
 Collection items can be listed separately by their active or archived status.
+Items without wearing history can also be permanently deleted.
 
 ## Requirements
 
@@ -117,6 +118,15 @@ are preserved; a missing item raises `CollectionItemNotFoundError`.
 `perfume_journal.sqlalchemy_store.list_collection_items()` returns collection
 items with the requested status, ordered by ascending ID. Filtering happens
 in PostgreSQL, and an empty result produces an empty list.
+
+`perfume_journal.sqlalchemy_store.delete_collection_item()` deletes an active
+or archived item in one transaction. A missing item raises
+`CollectionItemNotFoundError`. The existing foreign key prevents deletion when
+wearings reference the item: SQLSTATE `23001` and constraint
+`wearings_collection_item_id_fkey` are translated into
+`CollectionItemHasWearingsError`. The transaction is rolled back, preserving the
+item and its history. Other integrity errors propagate. The parent perfume is
+preserved after a successful item deletion.
 
 `perfume_journal.sqlalchemy_store.create_wearing()` checks that the parent
 collection item exists and inserts a wearing in the same session and
@@ -236,6 +246,18 @@ Responses:
 - `200 OK` — the requested status was applied;
 - `404 Not Found` — the collection item does not exist;
 - `422 Unprocessable Content` — the request body is invalid.
+
+### `DELETE /collection-items/{collection_item_id}`
+
+Permanently deletes an active or archived item only when it has no wearings.
+The parent perfume remains. An item with wearing history must be archived
+instead of deleted.
+
+Responses:
+
+- `204 No Content` — the item was deleted; the response body is empty;
+- `404 Not Found` — the collection item does not exist;
+- `409 Conflict` — the item has wearing history; existing data is preserved.
 
 ### `POST /collection-items/{collection_item_id}/wearings`
 

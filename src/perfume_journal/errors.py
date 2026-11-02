@@ -12,3 +12,7 @@ class CollectionItemNotFoundError(Exception):
 
 class CollectionItemArchivedError(Exception):
     pass
+
+
+class CollectionItemHasWearingsError(Exception):
+    pass

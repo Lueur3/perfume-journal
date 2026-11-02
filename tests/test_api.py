@@ -576,3 +576,79 @@ async def test_wrong_status_list_collection_items(async_client: AsyncClient) -> 
     )
 
     assert items_response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_correct_delete_collection_item(async_client: AsyncClient) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    delete_response = await async_client.delete(
+        f"/collection-items/{collection_item_id}"
+    )
+
+    assert delete_response.status_code == 204
+    assert delete_response.content == b""
+
+    details_response = await async_client.get(f"/perfumes/{perfume_id}")
+    details = details_response.json()
+    assert details["collection_items"] == []
+
+
+@pytest.mark.anyio
+async def test_delete_collection_item_not_found(async_client: AsyncClient) -> None:
+    delete_response = await async_client.delete("/collection-items/999")
+
+    assert delete_response.status_code == 404
+    assert delete_response.json()["detail"] == "Collection item not found."
+
+
+@pytest.mark.anyio
+async def test_delete_collection_item_with_wearing(async_client: AsyncClient) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+
+    first_details_response = await async_client.get(f"/perfumes/{perfume_id}")
+    first_details = first_details_response.json()
+
+    delete_response_failed = await async_client.delete(
+        f"/collection-items/{collection_item_id}"
+    )
+
+    assert delete_response_failed.status_code == 409
+    assert (
+        delete_response_failed.json()["detail"]
+        == "Cannot delete a collection item with wearing history."
+    )
+
+    second_details_response = await async_client.get(f"/perfumes/{perfume_id}")
+    second_details = second_details_response.json()
+
+    assert first_details == second_details

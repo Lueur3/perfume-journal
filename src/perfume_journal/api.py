@@ -10,6 +10,7 @@ import perfume_journal.sqlalchemy_store as sql_store
 from perfume_journal.config import get_database_url
 from perfume_journal.errors import (
     CollectionItemArchivedError,
+    CollectionItemHasWearingsError,
     CollectionItemNotFoundError,
     DuplicatePerfumeError,
     PerfumeNotFoundError,
@@ -183,3 +184,26 @@ async def list_collection_items(
     status: mdl.CollectionItemStatus = "active",
 ) -> list[mdl.CollectionItem]:
     return await sql_store.list_collection_items(session_factory, status)
+
+
+@app.delete(
+    "/collection-items/{collection_item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_collection_item(
+    collection_item_id: int,
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+) -> None:
+    try:
+        await sql_store.delete_collection_item(session_factory, collection_item_id)
+
+    except CollectionItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except CollectionItemHasWearingsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
