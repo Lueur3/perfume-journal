@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 import perfume_journal.models as mdl
 import perfume_journal.orm_models as orm
 from perfume_journal.errors import (
+    CollectionItemArchivedError,
     CollectionItemNotFoundError,
     DuplicatePerfumeError,
     PerfumeNotFoundError,
@@ -112,6 +113,11 @@ async def create_wearing(
 
         if collection_item is None:
             raise CollectionItemNotFoundError("Collection item not found.")
+
+        if collection_item.status == "archived":
+            raise CollectionItemArchivedError(
+                "Cannot add a wearing to an archived collection item."
+            )
 
         orm_wearing = orm.Wearing(
             collection_item_id=collection_item_id,
@@ -230,3 +236,22 @@ async def list_perfumes(
         return [
             mdl.Perfume.model_validate(item, from_attributes=True) for item in results
         ]
+
+
+async def set_collection_item_status(
+    session_factory: async_sessionmaker[AsyncSession],
+    collection_item_id: int,
+    status: mdl.CollectionItemStatus,
+) -> mdl.CollectionItem:
+    async with session_factory.begin() as session:
+        item = await session.get(orm.CollectionItem, collection_item_id)
+
+        if item is None:
+            raise CollectionItemNotFoundError("Collection item not found.")
+
+        item.status = status
+        await session.flush()
+
+        mdl_item = mdl.CollectionItem.model_validate(item, from_attributes=True)
+
+    return mdl_item

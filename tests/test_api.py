@@ -381,3 +381,144 @@ async def test_correct_list_perfumes(async_client: AsyncClient) -> None:
     items_by_id = {item["id"]: item for item in data}
     assert items_by_id == {perfume_1["id"]: perfume_1, perfume_2["id"]: perfume_2}
     assert data == [perfume_1, perfume_2]
+
+
+@pytest.mark.anyio
+async def test_correct_archive_status(async_client: AsyncClient) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    wearing_response = await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+    wearing_id_1 = wearing_response.json()["id"]
+
+    assert wearing_response.status_code == 201
+
+    archived_item_response = await async_client.patch(
+        f"/collection-items/{collection_item_id}", json={"status": "archived"}
+    )
+    archived_item = archived_item_response.json()
+
+    assert archived_item_response.status_code == 200
+    assert archived_item["status"] == "archived"
+    assert archived_item["id"] == collection_item_id
+
+    failed_wearing_response = await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+
+    assert failed_wearing_response.status_code == 409
+    assert (
+        failed_wearing_response.json()["detail"]
+        == "Cannot add a wearing to an archived collection item."
+    )
+
+    details_archived_response = await async_client.get(f"/perfumes/{perfume_id}")
+    details_archived = details_archived_response.json()
+
+    assert details_archived_response.status_code == 200
+    assert len(details_archived["collection_items"]) == 1
+    item_archived = details_archived["collection_items"][0]
+    assert item_archived["id"] == collection_item_id
+    assert item_archived["status"] == "archived"
+    assert item_archived["wearings"][0]["rating"] == 5
+    assert item_archived["wearings"][0]["comment"] == "Test comment"
+    assert item_archived["wearings"][0]["collection_item_id"] == archived_item["id"]
+    assert datetime.fromisoformat(
+        item_archived["wearings"][0]["worn_at"]
+    ) == datetime.fromisoformat("2026-10-02T09:30:00+03:00")
+    assert len(item_archived["wearings"]) == 1
+    wearing = item_archived["wearings"][0]
+
+    assert wearing["id"] == wearing_id_1
+    assert wearing["rating"] == 5
+    assert wearing["comment"] == "Test comment"
+    assert datetime.fromisoformat(wearing["worn_at"]) == datetime.fromisoformat(
+        "2026-10-02T09:30:00+03:00"
+    )
+
+    active_item_response = await async_client.patch(
+        f"/collection-items/{collection_item_id}", json={"status": "active"}
+    )
+    active_item = active_item_response.json()
+
+    assert active_item_response.status_code == 200
+    assert active_item == item_response.json()
+
+    wearing_response_2 = await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-12-03T09:30:00+03:00",
+            "rating": 7,
+            "comment": "Test comment",
+        },
+    )
+    wearing_id_2 = wearing_response_2.json()["id"]
+    assert wearing_response_2.status_code == 201
+
+    details_active_response = await async_client.get(f"/perfumes/{perfume_id}")
+    details_active = details_active_response.json()
+
+    assert details_active_response.status_code == 200
+    assert len(details_active["collection_items"][0]["wearings"]) == 2
+
+    items_by_id = {
+        item["id"]: item for item in details_active["collection_items"][0]["wearings"]
+    }
+    assert set(items_by_id.keys()) == {wearing_id_1, wearing_id_2}
+
+
+@pytest.mark.anyio
+async def test_archive_item_not_found(async_client: AsyncClient) -> None:
+    archive_item_response = await async_client.patch(
+        "/collection-items/999", json={"status": "active"}
+    )
+
+    assert archive_item_response.status_code == 404
+    assert archive_item_response.json()["detail"] == "Collection item not found."
+
+
+@pytest.mark.anyio
+async def test_invalid_item_status(async_client: AsyncClient) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    archived_item_response = await async_client.patch(
+        f"/collection-items/{collection_item_id}", json={"status": "deleted"}
+    )
+
+    assert archived_item_response.status_code == 422
+
+    details_active_response = await async_client.get(f"/perfumes/{perfume_id}")
+    details_active = details_active_response.json()
+
+    assert details_active["collection_items"][0]["status"] == "active"

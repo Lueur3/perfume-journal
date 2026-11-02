@@ -8,3 +8,7 @@ class PerfumeNotFoundError(Exception):
 
 class CollectionItemNotFoundError(Exception):
     pass
+
+
+class CollectionItemArchivedError(Exception):
+    pass

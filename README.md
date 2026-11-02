@@ -9,6 +9,8 @@ wearing history, and calculated average rating. Committed data remains
 available after the application restarts. Existing perfume records can be
 updated without changing their IDs. All perfume records can also be listed
 with their basic fields and IDs.
+Physical collection items can be archived and restored without losing their
+wearing history. Archived items cannot receive new wearings.
 
 ## Requirements
 
@@ -106,9 +108,15 @@ returns a Pydantic `CollectionItem` after a successful commit. Volume and
 acquisition date may be omitted, and identical items are allowed as separate
 physical instances.
 
+`perfume_journal.sqlalchemy_store.set_collection_item_status()` changes an
+existing item's status to `active` or `archived` in one transaction. Repeating
+the current status succeeds. The item ID, perfume relation, and wearing history
+are preserved; a missing item raises `CollectionItemNotFoundError`.
+
 `perfume_journal.sqlalchemy_store.create_wearing()` checks that the parent
 collection item exists and inserts a wearing in the same session and
 transaction. A missing parent raises the shared `CollectionItemNotFoundError`.
+An archived parent raises `CollectionItemArchivedError` before insertion.
 It returns a Pydantic `Wearing` after a successful commit. The supplied wearing
 time is preserved as an instant; rating and comment may be omitted. Repeated
 wearings with identical data are allowed and receive separate IDs.
@@ -121,6 +129,7 @@ A missing perfume raises `PerfumeNotFoundError`. Empty histories remain empty
 lists; unrated wearings remain in the history, and the average is `None` when
 no wearing has a rating. Items and wearings belonging to other perfumes are
 excluded. Collection order is not guaranteed.
+Archived items and their wearings remain included in the details and average.
 
 The HTTP handlers await the corresponding SQLAlchemy operations.
 `GET /perfumes/{perfume_id}` calls `get_perfume_details()` to preserve the nested
@@ -190,6 +199,27 @@ Responses:
 - `404 Not Found` — the referenced perfume does not exist;
 - `422 Unprocessable Content` — the request body is invalid.
 
+### `PATCH /collection-items/{collection_item_id}`
+
+Archives or restores a physical collection item. The required `status` field
+accepts `active` or `archived`. The response contains the updated item with its
+original ID. Repeating the current status succeeds, and existing wearings are
+preserved. The existing database schema supports this operation.
+
+Example request:
+
+```json
+{
+  "status": "archived"
+}
+```
+
+Responses:
+
+- `200 OK` — the requested status was applied;
+- `404 Not Found` — the collection item does not exist;
+- `422 Unprocessable Content` — the request body is invalid.
+
 ### `POST /collection-items/{collection_item_id}/wearings`
 
 Records one wearing of an existing collection item. `worn_at` is required and
@@ -211,6 +241,8 @@ Responses:
 
 - `201 Created` — the wearing was created;
 - `404 Not Found` — the referenced collection item does not exist;
+- `409 Conflict` — the collection item is archived; restore it before recording
+  another wearing;
 - `422 Unprocessable Content` — the request body is invalid.
 
 ### `GET /perfumes`
@@ -228,6 +260,7 @@ Returns a perfume together with its collection items, each item's wearing
 history, and the average of all specified wearing ratings. Wearings without a
 rating remain in the history but do not affect the average. `average_rating` is
 `null` when no wearing has a rating.
+Archived collection items and their wearing history are included.
 
 Responses:
 

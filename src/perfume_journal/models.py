@@ -70,3 +70,7 @@ class CollectionItemDetails(CollectionItem):
 class PerfumeDetails(Perfume):
     collection_items: list[CollectionItemDetails]
     average_rating: float | None
+
+
+class CollectionItemStatusUpdate(BaseModel):
+    status: CollectionItemStatus

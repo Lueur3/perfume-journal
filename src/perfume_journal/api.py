@@ -9,6 +9,7 @@ import perfume_journal.models as mdl
 import perfume_journal.sqlalchemy_store as sql_store
 from perfume_journal.config import get_database_url
 from perfume_journal.errors import (
+    CollectionItemArchivedError,
     CollectionItemNotFoundError,
     DuplicatePerfumeError,
     PerfumeNotFoundError,
@@ -89,6 +90,10 @@ async def create_wearing(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+    except CollectionItemArchivedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
 
 
 @app.get(
@@ -142,3 +147,25 @@ async def list_perfumes(
     ],
 ) -> list[mdl.Perfume]:
     return await sql_store.list_perfumes(session_factory)
+
+
+@app.patch(
+    "/collection-items/{collection_item_id}",
+    response_model=mdl.CollectionItem,
+    status_code=status.HTTP_200_OK,
+)
+async def set_collection_item_status(
+    collection_item_id: int,
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+    body: mdl.CollectionItemStatusUpdate,
+) -> mdl.CollectionItem:
+    try:
+        return await sql_store.set_collection_item_status(
+            session_factory, collection_item_id, body.status
+        )
+    except CollectionItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

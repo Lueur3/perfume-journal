@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 import perfume_journal.sqlalchemy_store as store
 from perfume_journal.errors import (
+    CollectionItemArchivedError,
     CollectionItemNotFoundError,
     DuplicatePerfumeError,
     PerfumeNotFoundError,
@@ -22,6 +23,7 @@ from perfume_journal.sqlalchemy_store import (
     get_perfume,
     get_perfume_details,
     list_perfumes,
+    set_collection_item_status,
     update_perfume,
 )
 
@@ -719,3 +721,132 @@ async def test_correct_list_perfumes(
         mdl_perfume_1.id,
         mdl_perfume_2.id,
     ]
+
+
+@pytest.mark.anyio
+async def test_correct_archive_status(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    data_wearing = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+        rating=10,
+        comment="Test comment",
+    )
+    mdl_wearing = await create_wearing(
+        session_factory,
+        collection_item_id=mdl_collection_item.id,
+        data=data_wearing,
+    )
+
+    archived_item = await set_collection_item_status(
+        session_factory, mdl_collection_item.id, "archived"
+    )
+    assert archived_item.status == "archived"
+    assert archived_item.id == mdl_collection_item.id
+    assert archived_item.perfume_id == mdl_perfume.id
+
+    details_archived = await get_perfume_details(
+        session_factory, perfume_id=mdl_perfume.id
+    )
+    assert len(details_archived.collection_items) == 1
+    item_archived = details_archived.collection_items[0]
+    assert item_archived.id == mdl_collection_item.id
+    assert item_archived.status == "archived"
+    assert item_archived.wearings == [mdl_wearing]
+
+    archived_item_repeat = await set_collection_item_status(
+        session_factory, mdl_collection_item.id, "archived"
+    )
+    assert archived_item_repeat == archived_item
+
+    active_item = await set_collection_item_status(
+        session_factory, mdl_collection_item.id, "active"
+    )
+    assert active_item == mdl_collection_item
+
+    details_active = await get_perfume_details(
+        session_factory, perfume_id=mdl_perfume.id
+    )
+    assert len(details_active.collection_items) == 1
+    item_active = details_active.collection_items[0]
+    assert item_active.status == "active"
+    assert item_active.wearings == [mdl_wearing]
+
+
+@pytest.mark.anyio
+async def test_set_collection_item_status_not_found(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+
+    with pytest.raises(CollectionItemNotFoundError):
+        await set_collection_item_status(
+            session_factory, collection_item_id=999, status="archived"
+        )
+
+
+@pytest.mark.anyio
+async def test_archived_create_wearing(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    await set_collection_item_status(
+        session_factory, mdl_collection_item.id, "archived"
+    )
+
+    data_wearing = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+        rating=10,
+        comment="Test comment",
+    )
+
+    with pytest.raises(CollectionItemArchivedError):
+        await create_wearing(
+            session_factory,
+            collection_item_id=mdl_collection_item.id,
+            data=data_wearing,
+        )
+
+    details_archived = await get_perfume_details(
+        session_factory, perfume_id=mdl_perfume.id
+    )
+    assert len(details_archived.collection_items) == 1
+    item_archived = details_archived.collection_items[0]
+    assert item_archived.id == mdl_collection_item.id
+    assert item_archived.status == "archived"
+    assert item_archived.wearings == []
+
+    await set_collection_item_status(session_factory, mdl_collection_item.id, "active")
+
+    mdl_wearing = await create_wearing(
+        session_factory,
+        collection_item_id=mdl_collection_item.id,
+        data=data_wearing,
+    )
+
+    details_active = await get_perfume_details(
+        session_factory, perfume_id=mdl_perfume.id
+    )
+    assert len(details_active.collection_items) == 1
+    item_active = details_active.collection_items[0]
+    assert item_active.id == mdl_collection_item.id
+    assert item_active.status == "active"
+    assert item_active.wearings == [mdl_wearing]
