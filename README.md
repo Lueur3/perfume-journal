@@ -11,6 +11,7 @@ updated without changing their IDs. All perfume records can also be listed
 with their basic fields and IDs.
 Physical collection items can be archived and restored without losing their
 wearing history. Archived items cannot receive new wearings.
+Collection items can be listed separately by their active or archived status.
 
 ## Requirements
 
@@ -113,6 +114,10 @@ existing item's status to `active` or `archived` in one transaction. Repeating
 the current status succeeds. The item ID, perfume relation, and wearing history
 are preserved; a missing item raises `CollectionItemNotFoundError`.
 
+`perfume_journal.sqlalchemy_store.list_collection_items()` returns collection
+items with the requested status, ordered by ascending ID. Filtering happens
+in PostgreSQL, and an empty result produces an empty list.
+
 `perfume_journal.sqlalchemy_store.create_wearing()` checks that the parent
 collection item exists and inserts a wearing in the same session and
 transaction. A missing parent raises the shared `CollectionItemNotFoundError`.
@@ -198,6 +203,18 @@ Responses:
 - `201 Created` — the collection item was created;
 - `404 Not Found` — the referenced perfume does not exist;
 - `422 Unprocessable Content` — the request body is invalid.
+
+### `GET /collection-items`
+
+Returns collection items ordered by ascending `id`, filtered by the `status`
+query parameter. The default is `active`; use
+`/collection-items?status=archived` to view archived items. Each result contains
+the item's fields and its `perfume_id`, without nested wearing history.
+
+Responses:
+
+- `200 OK` — a JSON array of matching items, or `[]` when none match;
+- `422 Unprocessable Content` — `status` is neither `active` nor `archived`.
 
 ### `PATCH /collection-items/{collection_item_id}`
 

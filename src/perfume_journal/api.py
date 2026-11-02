@@ -169,3 +169,17 @@ async def set_collection_item_status(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+
+
+@app.get(
+    "/collection-items",
+    response_model=list[mdl.CollectionItem],
+    status_code=status.HTTP_200_OK,
+)
+async def list_collection_items(
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+    status: mdl.CollectionItemStatus = "active",
+) -> list[mdl.CollectionItem]:
+    return await sql_store.list_collection_items(session_factory, status)

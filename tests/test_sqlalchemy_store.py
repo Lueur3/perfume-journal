@@ -22,6 +22,7 @@ from perfume_journal.sqlalchemy_store import (
     create_wearing,
     get_perfume,
     get_perfume_details,
+    list_collection_items,
     list_perfumes,
     set_collection_item_status,
     update_perfume,
@@ -850,3 +851,44 @@ async def test_archived_create_wearing(
     assert item_active.id == mdl_collection_item.id
     assert item_active.status == "active"
     assert item_active.wearings == [mdl_wearing]
+
+
+@pytest.mark.anyio
+async def test_empty_list_collection_items(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    result = await list_collection_items(session_factory, "active")
+
+    assert result == []
+
+
+@pytest.mark.anyio
+async def test_correct_list_collection_items(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item_1 = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    data_collection_item_2 = CollectionItemCreate(
+        kind="bottle", initial_volume_ml=200, acquired_on=date(2026, 9, 20)
+    )
+
+    mdl_collection_item_1 = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item_1
+    )
+    mdl_collection_item_2 = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item_2
+    )
+
+    archived_item = await set_collection_item_status(
+        session_factory, mdl_collection_item_2.id, "archived"
+    )
+
+    active_items_list = await list_collection_items(session_factory, "active")
+    assert active_items_list == [mdl_collection_item_1]
+
+    archived_items_list = await list_collection_items(session_factory, "archived")
+    assert archived_items_list == [archived_item]

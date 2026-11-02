@@ -255,3 +255,20 @@ async def set_collection_item_status(
         mdl_item = mdl.CollectionItem.model_validate(item, from_attributes=True)
 
     return mdl_item
+
+
+async def list_collection_items(
+    session_factory: async_sessionmaker[AsyncSession],
+    status: mdl.CollectionItemStatus,
+) -> list[mdl.CollectionItem]:
+    async with session_factory() as session:
+        results = await session.scalars(
+            select(orm.CollectionItem)
+            .where(orm.CollectionItem.status == status)
+            .order_by(orm.CollectionItem.id)
+        )
+
+        return [
+            mdl.CollectionItem.model_validate(item, from_attributes=True)
+            for item in results
+        ]

@@ -522,3 +522,57 @@ async def test_invalid_item_status(async_client: AsyncClient) -> None:
     details_active = details_active_response.json()
 
     assert details_active["collection_items"][0]["status"] == "active"
+
+
+@pytest.mark.anyio
+async def test_empty_list_collection_items(async_client: AsyncClient) -> None:
+    response = await async_client.get(
+        "/collection-items", params={"status": "archived"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.anyio
+async def test_correct_list_collection_items(async_client: AsyncClient) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response_1 = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    item_response_2 = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id_2 = item_response_2.json()["id"]
+
+    archived_item_resp = await async_client.patch(
+        f"/collection-items/{collection_item_id_2}", json={"status": "archived"}
+    )
+
+    active_items_response = await async_client.get("/collection-items")
+    assert active_items_response.status_code == 200
+    active_items = active_items_response.json()
+    assert active_items == [item_response_1.json()]
+
+    archived_items_response = await async_client.get(
+        "/collection-items", params={"status": "archived"}
+    )
+    assert archived_items_response.status_code == 200
+    archived_items = archived_items_response.json()
+    assert archived_items == [archived_item_resp.json()]
+
+
+@pytest.mark.anyio
+async def test_wrong_status_list_collection_items(async_client: AsyncClient) -> None:
+    items_response = await async_client.get(
+        "/collection-items", params={"status": "deleted"}
+    )
+
+    assert items_response.status_code == 422
