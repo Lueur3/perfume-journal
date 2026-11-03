@@ -352,6 +352,61 @@ async def test_wrong_data_perfume_update(async_client: AsyncClient) -> None:
 
 
 @pytest.mark.anyio
+async def test_perfume_update(async_client: AsyncClient) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Tom Ford", "name": "Oud Wood", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+
+    await async_client.patch(
+        f"/collection-items/{collection_item_id}", json={"status": "archived"}
+    )
+
+    details_before_response = await async_client.get(f"/perfumes/{perfume_id}")
+    assert details_before_response.status_code == 200
+    details_before = details_before_response.json()
+
+    assert len(details_before["collection_items"]) == 1
+    assert details_before["collection_items"][0]["status"] == "archived"
+    assert details_before["average_rating"] == 5
+
+    updated_perfume_response = await async_client.put(
+        f"/perfumes/{perfume_id}",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edp"},
+    )
+    assert updated_perfume_response.status_code == 200
+    updated_perfume = updated_perfume_response.json()
+
+    details_after_response = await async_client.get(f"/perfumes/{perfume_id}")
+    assert details_after_response.status_code == 200
+    details_after = details_after_response.json()
+
+    assert updated_perfume["id"] == perfume_id
+    assert updated_perfume["brand"] == "Creed"
+    assert updated_perfume["name"] == "Aventus"
+    assert updated_perfume["concentration"] == "EDP"
+
+    assert details_after["collection_items"] == details_before["collection_items"]
+    assert details_after["average_rating"] == details_before["average_rating"]
+
+
+@pytest.mark.anyio
 async def test_empty_list_perfumes(async_client: AsyncClient) -> None:
     results = await async_client.get("/perfumes")
 
