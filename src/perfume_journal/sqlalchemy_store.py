@@ -11,6 +11,7 @@ from perfume_journal.errors import (
     DuplicatePerfumeError,
     PerfumeHasCollectionItemsError,
     PerfumeNotFoundError,
+    WearingNotFoundError,
 )
 from perfume_journal.normalization import create_key
 
@@ -334,3 +335,16 @@ async def delete_perfume(
             ) from exc
         else:
             raise
+
+
+async def delete_wearing(
+    session_factory: async_sessionmaker[AsyncSession], wearing_id: int
+) -> None:
+    async with session_factory.begin() as session:
+        wearing = await session.get(orm.Wearing, wearing_id)
+
+        if wearing is None:
+            raise WearingNotFoundError("Wearing not found.")
+
+        await session.delete(wearing)
+        await session.flush()

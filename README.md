@@ -15,6 +15,8 @@ Collection items can be listed separately by their active or archived status.
 Items without wearing history can also be permanently deleted.
 Perfume records can be permanently deleted only when they have no collection
 items, including archived ones.
+Individual wearings can be permanently deleted from active or archived items
+to correct the journal.
 
 ## Requirements
 
@@ -144,6 +146,12 @@ An archived parent raises `CollectionItemArchivedError` before insertion.
 It returns a Pydantic `Wearing` after a successful commit. The supplied wearing
 time is preserved as an instant; rating and comment may be omitted. Repeated
 wearings with identical data are allowed and receive separate IDs.
+
+`perfume_journal.sqlalchemy_store.delete_wearing()` deletes one wearing in a
+transaction, regardless of its item's status. A missing record raises
+`WearingNotFoundError`. The parent item, its status, the perfume, and other
+wearings are preserved. Subsequent details requests calculate the average
+rating from the remaining wearings.
 
 `perfume_journal.sqlalchemy_store.get_perfume_details()` returns a Pydantic
 `PerfumeDetails` with the perfume's collection items, each item's wearing
@@ -303,6 +311,18 @@ Responses:
 - `409 Conflict` — the collection item is archived; restore it before recording
   another wearing;
 - `422 Unprocessable Content` — the request body is invalid.
+
+### `DELETE /wearings/{wearing_id}`
+
+Permanently deletes one wearing, including from an archived item. The item's
+status is preserved. The next details response reflects the remaining history
+and ratings; the average is `null` when no rated wearings remain. An item with
+no remaining wearings can then be deleted through the item deletion endpoint.
+
+Responses:
+
+- `204 No Content` — the wearing was deleted; the response body is empty;
+- `404 Not Found` — the wearing does not exist, including on repeated deletion.
 
 ### `GET /perfumes`
 

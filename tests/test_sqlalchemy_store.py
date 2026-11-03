@@ -13,6 +13,7 @@ from perfume_journal.errors import (
     DuplicatePerfumeError,
     PerfumeHasCollectionItemsError,
     PerfumeNotFoundError,
+    WearingNotFoundError,
 )
 from perfume_journal.models import CollectionItemCreate, PerfumeCreate, WearingCreate
 from perfume_journal.orm_models import CollectionItem as CollectionItemRow
@@ -24,6 +25,7 @@ from perfume_journal.sqlalchemy_store import (
     create_wearing,
     delete_collection_item,
     delete_perfume,
+    delete_wearing,
     get_perfume,
     get_perfume_details,
     list_collection_items,
@@ -1064,3 +1066,93 @@ async def test_delete_perfume_with_archived_collection_item(
     details_after = await get_perfume_details(session_factory, mdl_perfume.id)
 
     assert details_before == details_after
+
+
+@pytest.mark.anyio
+async def test_delete_wearing(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    data_wearing_1 = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+        rating=6,
+        comment="Test comment",
+    )
+    mdl_wearing_1 = await create_wearing(
+        session_factory, collection_item_id=mdl_collection_item.id, data=data_wearing_1
+    )
+
+    data_wearing_2 = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-09-02T09:30:00+03:00"),
+        rating=10,
+        comment="Test comment",
+    )
+    mdl_wearing_2 = await create_wearing(
+        session_factory, collection_item_id=mdl_collection_item.id, data=data_wearing_2
+    )
+
+    details_before = await get_perfume_details(session_factory, mdl_perfume.id)
+
+    await delete_wearing(session_factory, mdl_wearing_1.id)
+
+    details_after = await get_perfume_details(session_factory, mdl_perfume.id)
+
+    assert details_before.average_rating != details_after.average_rating
+    assert details_after.average_rating == 10
+    assert details_after.id == mdl_perfume.id
+    assert len(details_after.collection_items) == 1
+    assert details_after.collection_items[0].id == mdl_collection_item.id
+    assert details_after.collection_items[0].wearings == [mdl_wearing_2]
+
+
+@pytest.mark.anyio
+async def test_delete_wearing_with_archived_item(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    data_wearing = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+        rating=6,
+        comment="Test comment",
+    )
+    mdl_wearing = await create_wearing(
+        session_factory, collection_item_id=mdl_collection_item.id, data=data_wearing
+    )
+
+    await set_collection_item_status(
+        session_factory, mdl_collection_item.id, "archived"
+    )
+
+    await delete_wearing(session_factory, mdl_wearing.id)
+
+    details = await get_perfume_details(session_factory, mdl_perfume.id)
+
+    assert details.average_rating is None
+    assert details.collection_items[0].wearings == []
+    assert details.collection_items[0].status == "archived"
+
+
+@pytest.mark.anyio
+async def test_delete_wearing_unknown_id(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    with pytest.raises(WearingNotFoundError):
+        await delete_wearing(session_factory, wearing_id=999)

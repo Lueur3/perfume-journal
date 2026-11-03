@@ -15,6 +15,7 @@ from perfume_journal.errors import (
     DuplicatePerfumeError,
     PerfumeHasCollectionItemsError,
     PerfumeNotFoundError,
+    WearingNotFoundError,
 )
 
 
@@ -226,4 +227,19 @@ async def delete_perfume(
     except PerfumeHasCollectionItemsError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
+
+
+@app.delete("/wearings/{wearing_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_wearing(
+    wearing_id: int,
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+) -> None:
+    try:
+        await sql_store.delete_wearing(session_factory, wearing_id)
+    except WearingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc

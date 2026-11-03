@@ -766,3 +766,59 @@ async def test_failed_delete_perfume_with_collection_item(
     details_after = details_after_response.json()
 
     assert details_before == details_after
+
+
+@pytest.mark.anyio
+async def test_correct_delete_wearing(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    wearing_response = await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+    wearing_id = wearing_response.json()["id"]
+
+    await async_client.patch(
+        f"/collection-items/{collection_item_id}", json={"status": "archived"}
+    )
+
+    delete_wearing_response = await async_client.delete(f"/wearings/{wearing_id}")
+
+    assert delete_wearing_response.status_code == 204
+    assert delete_wearing_response.content == b""
+
+    details_response = await async_client.get(f"/perfumes/{perfume_id}")
+    details = details_response.json()
+
+    assert details["collection_items"][0]["status"] == "archived"
+    assert details["collection_items"][0]["wearings"] == []
+    assert details["average_rating"] is None
+
+    failed_delete_response = await async_client.delete(f"/wearings/{wearing_id}")
+    assert failed_delete_response.status_code == 404
+    assert failed_delete_response.json()["detail"] == "Wearing not found."
+
+
+@pytest.mark.anyio
+async def test_delete_wearing_with_unknown_id(
+    async_client: AsyncClient,
+) -> None:
+    delete_response = await async_client.delete("/wearings/999")
+    assert delete_response.status_code == 404
+    assert delete_response.json()["detail"] == "Wearing not found."

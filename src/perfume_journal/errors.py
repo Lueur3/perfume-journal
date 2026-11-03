@@ -20,3 +20,7 @@ class CollectionItemHasWearingsError(Exception):
 
 class PerfumeHasCollectionItemsError(Exception):
     pass
+
+
+class WearingNotFoundError(Exception):
+    pass
