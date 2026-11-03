@@ -11,6 +11,7 @@ from perfume_journal.errors import (
     CollectionItemHasWearingsError,
     CollectionItemNotFoundError,
     DuplicatePerfumeError,
+    PerfumeHasCollectionItemsError,
     PerfumeNotFoundError,
 )
 from perfume_journal.models import CollectionItemCreate, PerfumeCreate, WearingCreate
@@ -22,6 +23,7 @@ from perfume_journal.sqlalchemy_store import (
     create_perfume,
     create_wearing,
     delete_collection_item,
+    delete_perfume,
     get_perfume,
     get_perfume_details,
     list_collection_items,
@@ -985,3 +987,80 @@ async def test_failed_delete_collection_item_with_wearings(
 
     assert details.collection_items[0].id == mdl_collection_item.id
     assert details.collection_items[0].wearings == [mdl_wearing]
+
+
+@pytest.mark.anyio
+async def test_correct_delete_perfume(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    await delete_perfume(session_factory, mdl_perfume.id)
+
+    async with session_factory() as session:
+        res = await session.scalars(select(PerfumeRow))
+        assert res.all() == []
+
+        perfume = await session.get(PerfumeRow, mdl_perfume.id)
+        assert perfume is None
+
+
+@pytest.mark.anyio
+async def test_unknown_id_delete_perfume(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    with pytest.raises(PerfumeNotFoundError):
+        await delete_perfume(session_factory, 999)
+
+
+@pytest.mark.anyio
+async def test_delete_perfume_with_active_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    details_before = await get_perfume_details(session_factory, mdl_perfume.id)
+
+    with pytest.raises(PerfumeHasCollectionItemsError):
+        await delete_perfume(session_factory, mdl_perfume.id)
+
+    details_after = await get_perfume_details(session_factory, mdl_perfume.id)
+
+    assert details_before == details_after
+
+
+@pytest.mark.anyio
+async def test_delete_perfume_with_archived_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    await set_collection_item_status(
+        session_factory, mdl_collection_item.id, "archived"
+    )
+
+    details_before = await get_perfume_details(session_factory, mdl_perfume.id)
+
+    with pytest.raises(PerfumeHasCollectionItemsError):
+        await delete_perfume(session_factory, mdl_perfume.id)
+
+    details_after = await get_perfume_details(session_factory, mdl_perfume.id)
+
+    assert details_before == details_after

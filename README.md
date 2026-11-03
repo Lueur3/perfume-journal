@@ -13,6 +13,8 @@ Physical collection items can be archived and restored without losing their
 wearing history. Archived items cannot receive new wearings.
 Collection items can be listed separately by their active or archived status.
 Items without wearing history can also be permanently deleted.
+Perfume records can be permanently deleted only when they have no collection
+items, including archived ones.
 
 ## Requirements
 
@@ -101,6 +103,13 @@ collection items or wearings.
 `perfume_journal.sqlalchemy_store.list_perfumes()` returns all perfumes as
 Pydantic `Perfume` models ordered by ascending ID, including perfumes without
 collection items. An empty table produces an empty list.
+
+`perfume_journal.sqlalchemy_store.delete_perfume()` deletes a perfume in one
+transaction. A missing record raises `PerfumeNotFoundError`. Any collection
+item, including an archived one, prevents deletion through the existing foreign
+key. SQLSTATE `23001` and constraint `collection_items_perfume_id_fkey` are
+translated into `PerfumeHasCollectionItemsError`; the transaction is rolled
+back and existing data is preserved. Other integrity errors propagate.
 
 `perfume_journal.sqlalchemy_store.create_collection_item()` checks that the
 parent perfume exists and inserts a physical sample or bottle in the same
@@ -191,6 +200,17 @@ Responses:
 - `409 Conflict` — the replacement values conflict with another perfume's
   normalized brand, name, and concentration; existing data is preserved;
 - `422 Unprocessable Content` — the request body is invalid.
+
+### `DELETE /perfumes/{perfume_id}`
+
+Permanently deletes a perfume only when it has no collection items. Archived
+items also prevent deletion.
+
+Responses:
+
+- `204 No Content` — the perfume was deleted; the response body is empty;
+- `404 Not Found` — the perfume does not exist;
+- `409 Conflict` — the perfume has collection items; existing data is preserved.
 
 ### `POST /perfumes/{perfume_id}/collection-items`
 

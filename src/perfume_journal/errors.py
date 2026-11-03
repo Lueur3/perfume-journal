@@ -16,3 +16,7 @@ class CollectionItemArchivedError(Exception):
 
 class CollectionItemHasWearingsError(Exception):
     pass
+
+
+class PerfumeHasCollectionItemsError(Exception):
+    pass

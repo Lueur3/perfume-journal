@@ -9,6 +9,7 @@ from perfume_journal.errors import (
     CollectionItemHasWearingsError,
     CollectionItemNotFoundError,
     DuplicatePerfumeError,
+    PerfumeHasCollectionItemsError,
     PerfumeNotFoundError,
 )
 from perfume_journal.normalization import create_key
@@ -300,6 +301,36 @@ async def delete_collection_item(
         ):
             raise CollectionItemHasWearingsError(
                 "Cannot delete a collection item with wearing history."
+            ) from exc
+        else:
+            raise
+
+
+async def delete_perfume(
+    session_factory: async_sessionmaker[AsyncSession],
+    perfume_id: int,
+) -> None:
+    try:
+        async with session_factory.begin() as session:
+            perfume = await session.get(orm.Perfume, perfume_id)
+
+            if perfume is None:
+                raise PerfumeNotFoundError("Perfume not found.")
+
+            await session.delete(perfume)
+            await session.flush()
+
+    except IntegrityError as exc:
+        driver_error = exc.driver_exception
+        sqlstate = getattr(driver_error, "sqlstate", None)
+        constraint_name = getattr(driver_error, "constraint_name", None)
+
+        if (
+            sqlstate == "23001"
+            and constraint_name == "collection_items_perfume_id_fkey"
+        ):
+            raise PerfumeHasCollectionItemsError(
+                "Cannot delete a perfume with collection items."
             ) from exc
         else:
             raise
