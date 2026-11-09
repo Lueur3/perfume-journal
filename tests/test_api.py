@@ -439,6 +439,41 @@ async def test_correct_list_perfumes(async_client: AsyncClient) -> None:
 
 
 @pytest.mark.anyio
+async def test_list_perfumes_search(async_client: AsyncClient) -> None:
+    aventus_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    await async_client.post(
+        "/perfumes",
+        json={"brand": "Tom Ford", "name": "Oud Wood"},
+    )
+    expected_perfume = aventus_response.json()
+
+    response = await async_client.get("/perfumes", params={"q": "AVEN"})
+
+    assert response.status_code == 200
+    assert response.json() == [expected_perfume]
+
+
+@pytest.mark.anyio
+async def test_list_perfumes_search_no_matches(async_client: AsyncClient) -> None:
+    await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    await async_client.post(
+        "/perfumes",
+        json={"brand": "Tom Ford", "name": "Oud Wood"},
+    )
+
+    response = await async_client.get("/perfumes", params={"q": "Dior"})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.anyio
 async def test_correct_archive_status(async_client: AsyncClient) -> None:
     perfume_response = await async_client.post(
         "/perfumes",

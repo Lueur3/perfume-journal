@@ -7,8 +7,8 @@ adding physical samples or bottles to them, and recording wearings for those
 collection items. A perfume can be retrieved with its collection items,
 wearing history, and calculated average rating. Committed data remains
 available after the application restarts. Existing perfume records can be
-updated without changing their IDs. All perfume records can also be listed
-with their basic fields and IDs.
+updated without changing their IDs. Perfume records can be listed with their
+basic fields and searched by brand or name.
 Physical collection items can be archived and restored without losing their
 wearing history. Archived items cannot receive new wearings.
 Collection items can be listed separately by their active or archived status.
@@ -102,9 +102,10 @@ one perfume by its primary key. It returns a Pydantic `Perfume` containing
 `PerfumeNotFoundError` if the record does not exist. It does not assemble
 collection items or wearings.
 
-`perfume_journal.sqlalchemy_store.list_perfumes()` returns all perfumes as
-Pydantic `Perfume` models ordered by ascending ID, including perfumes without
-collection items. An empty table produces an empty list.
+`perfume_journal.sqlalchemy_store.list_perfumes()` returns basic perfume records
+ordered by ascending ID. An optional `q` filters by a case-insensitive substring
+of the brand or name. The database treats `%` and `_` in the search text as
+literal characters.
 
 `perfume_journal.sqlalchemy_store.delete_perfume()` deletes a perfume in one
 transaction. A missing record raises `PerfumeNotFoundError`. Any collection
@@ -326,12 +327,14 @@ Responses:
 
 ### `GET /perfumes`
 
-Returns all perfume records ordered by ascending `id`. Each record contains
-`id`, `brand`, `name`, and `concentration`; collection items, wearings, and the
-average rating are available through the details endpoint instead. Perfumes
-without collection items are included.
+Returns perfume records ordered by ascending `id`. Each record contains `id`,
+`brand`, `name`, and `concentration`. Perfumes without collection items are
+included.
 
-The response is `200 OK` with a JSON array, or `[]` when no perfumes exist.
+Use the optional query parameter `q` to search by a substring of the brand or
+name, ignoring case. For example, `/perfumes?q=AVEN` matches `Aventus`. Leading
+and trailing whitespace is trimmed. An omitted or blank `q` returns all records.
+The response is `200 OK` with a JSON array, or `[]` when there are no matches.
 
 ### `GET /perfumes/{perfume_id}`
 

@@ -731,6 +731,39 @@ async def test_correct_list_perfumes(
 
 
 @pytest.mark.anyio
+async def test_list_perfumes_search(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume_1 = PerfumeCreate(
+        brand="Tom Ford", name="Oud Wood", concentration="EDT"
+    )
+    data_perfume_2 = PerfumeCreate(brand="Creed", name="Aventus")
+    data_perfume_3 = PerfumeCreate(brand="Chanel", name="Bleu de Chanel")
+
+    mdl_perfume_1 = await create_perfume(session_factory, data_perfume_1)
+    mdl_perfume_2 = await create_perfume(session_factory, data_perfume_2)
+    await create_perfume(session_factory, data_perfume_3)
+
+    find_perfume_1 = await list_perfumes(session_factory, q="ford")
+    find_perfume_2 = await list_perfumes(session_factory, q="AVEN  ")
+
+    assert find_perfume_1 == [mdl_perfume_1]
+    assert find_perfume_2 == [mdl_perfume_2]
+
+
+@pytest.mark.anyio
+async def test_list_perfumes_search_no_matches(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT")
+    await create_perfume(session_factory, data_perfume)
+
+    result = await list_perfumes(session_factory, q="Dior")
+
+    assert result == []
+
+
+@pytest.mark.anyio
 async def test_correct_archive_status(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:

@@ -148,8 +148,9 @@ async def list_perfumes(
     session_factory: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_session_factory)
     ],
+    q: str | None = None,
 ) -> list[mdl.Perfume]:
-    return await sql_store.list_perfumes(session_factory)
+    return await sql_store.list_perfumes(session_factory, q=q)
 
 
 @app.patch(

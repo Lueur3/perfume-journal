@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -232,9 +232,19 @@ async def update_perfume(
 
 async def list_perfumes(
     session_factory: async_sessionmaker[AsyncSession],
+    q: str | None = None,
 ) -> list[mdl.Perfume]:
     async with session_factory() as session:
-        results = await session.scalars(select(orm.Perfume).order_by(orm.Perfume.id))
+        query = select(orm.Perfume).order_by(orm.Perfume.id)
+        if q and (search_term := q.strip()):
+            query = query.where(
+                or_(
+                    orm.Perfume.brand.icontains(search_term, autoescape=True),
+                    orm.Perfume.name.icontains(search_term, autoescape=True),
+                )
+            )
+
+        results = await session.scalars(query)
 
         return [
             mdl.Perfume.model_validate(item, from_attributes=True) for item in results
