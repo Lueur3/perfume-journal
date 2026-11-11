@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -284,6 +286,34 @@ async def list_collection_items(
         return [
             mdl.CollectionItem.model_validate(item, from_attributes=True)
             for item in results
+        ]
+
+
+async def list_wearings(
+    session_factory: async_sessionmaker[AsyncSession],
+    collection_item_id: int,
+    worn_from: datetime | None = None,
+    worn_before: datetime | None = None,
+) -> list[mdl.Wearing]:
+    async with session_factory() as session:
+        collection_item = await session.get(orm.CollectionItem, collection_item_id)
+        if collection_item is None:
+            raise CollectionItemNotFoundError("Collection item not found.")
+
+        stmt = (
+            select(orm.Wearing)
+            .where(orm.Wearing.collection_item_id == collection_item_id)
+            .order_by(orm.Wearing.worn_at.desc())
+        )
+        if worn_from is not None:
+            stmt = stmt.where(orm.Wearing.worn_at >= worn_from)
+        if worn_before is not None:
+            stmt = stmt.where(orm.Wearing.worn_at < worn_before)
+
+        results = await session.scalars(stmt)
+
+        return [
+            mdl.Wearing.model_validate(item, from_attributes=True) for item in results
         ]
 
 

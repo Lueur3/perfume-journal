@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated, cast
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
+from pydantic import AwareDatetime
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import perfume_journal.models as mdl
@@ -96,6 +97,39 @@ async def create_wearing(
     except CollectionItemArchivedError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
+
+
+@app.get(
+    "/collection-items/{collection_item_id}/wearings",
+    response_model=list[mdl.Wearing],
+    status_code=status.HTTP_200_OK,
+)
+async def list_wearings(
+    collection_item_id: int,
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession],
+        Depends(get_session_factory),
+    ],
+    worn_from: AwareDatetime | None = None,
+    worn_before: AwareDatetime | None = None,
+) -> list[mdl.Wearing]:
+    if worn_from and worn_before and worn_from > worn_before:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="worn_from cannot be after worn_before.",
+        )
+
+    try:
+        return await sql_store.list_wearings(
+            session_factory,
+            collection_item_id,
+            worn_from=worn_from,
+            worn_before=worn_before,
+        )
+    except CollectionItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
 
 

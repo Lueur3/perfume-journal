@@ -669,6 +669,131 @@ async def test_wrong_status_list_collection_items(async_client: AsyncClient) -> 
 
 
 @pytest.mark.anyio
+async def test_list_wearings_filter_by_date(async_client: AsyncClient) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    wearing_response_1 = await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={"worn_at": "2026-10-28T10:00:00+03:00", "rating": 8},
+    )
+    wearing_1 = wearing_response_1.json()
+
+    wearing_response_2 = await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={"worn_at": "2026-11-01T12:00:00+03:00", "rating": 9},
+    )
+    wearing_2 = wearing_response_2.json()
+
+    wearing_response_3 = await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={"worn_at": "2026-11-05T10:00:00+03:00", "rating": 7},
+    )
+    assert wearing_response_3.status_code == 201
+
+    params = {
+        "worn_from": "2026-10-28T10:00:00+03:00",
+        "worn_before": "2026-11-05T10:00:00+03:00",
+    }
+    response = await async_client.get(
+        f"/collection-items/{collection_item_id}/wearings",
+        params=params,
+    )
+    results = response.json()
+
+    assert response.status_code == 200
+    assert len(results) == 2
+    assert [item["id"] for item in results] == [wearing_2["id"], wearing_1["id"]]
+    items_by_id = {item["id"]: item for item in results}
+    row1 = items_by_id[wearing_1["id"]]
+    row2 = items_by_id[wearing_2["id"]]
+
+    assert row1["rating"] == 8
+    assert row1["comment"] is None
+    assert row1["collection_item_id"] == collection_item_id
+    assert datetime.fromisoformat(row1["worn_at"]) == datetime.fromisoformat(
+        "2026-10-28T07:00:00+00:00"
+    )
+
+    assert row2["rating"] == 9
+    assert row2["comment"] is None
+    assert row2["collection_item_id"] == collection_item_id
+    assert datetime.fromisoformat(row2["worn_at"]) == datetime.fromisoformat(
+        "2026-11-01T09:00:00+00:00"
+    )
+
+
+@pytest.mark.anyio
+async def test_list_wearings_naive_datetime_returns_422(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    params = {"worn_from": "2026-11-05T00:00:00"}
+    response = await async_client.get(
+        f"/collection-items/{collection_item_id}/wearings",
+        params=params,
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_list_wearings_invalid_range_returns_422(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    collection_item_id = item_response.json()["id"]
+
+    params = {
+        "worn_from": "2026-11-05T10:00:00+03:00",
+        "worn_before": "2026-10-28T10:00:00+03:00",
+    }
+    response = await async_client.get(
+        f"/collection-items/{collection_item_id}/wearings",
+        params=params,
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_list_wearings_not_found(async_client: AsyncClient) -> None:
+    response = await async_client.get(
+        "/collection-items/999/wearings",
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.anyio
 async def test_correct_delete_collection_item(async_client: AsyncClient) -> None:
     perfume_response = await async_client.post(
         "/perfumes",

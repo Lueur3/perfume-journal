@@ -30,6 +30,7 @@ from perfume_journal.sqlalchemy_store import (
     get_perfume_details,
     list_collection_items,
     list_perfumes,
+    list_wearings,
     set_collection_item_status,
     update_perfume,
 )
@@ -931,6 +932,131 @@ async def test_correct_list_collection_items(
 
     archived_items_list = await list_collection_items(session_factory, "archived")
     assert archived_items_list == [archived_item]
+
+
+@pytest.mark.anyio
+async def test_correct_list_wearings(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    other_item_data = CollectionItemCreate(
+        kind="bottle", initial_volume_ml=150, acquired_on=date(2026, 9, 15)
+    )
+    other_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=other_item_data
+    )
+
+    data_wearing_1 = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-10-28T15:00:00+03:00"),
+        rating=9,
+    )
+    mdl_wearing_1 = await create_wearing(
+        session_factory, mdl_collection_item.id, data_wearing_1
+    )
+
+    data_wearing_2 = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-11-05T15:00:00+03:00"),
+        rating=9,
+    )
+    mdl_wearing_2 = await create_wearing(
+        session_factory, mdl_collection_item.id, data_wearing_2
+    )
+
+    data_wearing_3 = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-10-15T15:00:00+03:00"),
+        rating=9,
+    )
+    await create_wearing(session_factory, other_item.id, data_wearing_3)
+
+    wearings = await list_wearings(session_factory, mdl_collection_item.id)
+
+    assert wearings == [mdl_wearing_2, mdl_wearing_1]
+
+
+@pytest.mark.anyio
+async def test_empty_list_wearings(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    wearings = await list_wearings(session_factory, mdl_collection_item.id)
+
+    assert wearings == []
+
+
+@pytest.mark.anyio
+async def test_list_wearings_not_found(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    with pytest.raises(CollectionItemNotFoundError):
+        await list_wearings(session_factory, collection_item_id=999)
+
+
+@pytest.mark.anyio
+async def test_list_wearings_dates(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    mdl_perfume = await create_perfume(session_factory, data_perfume)
+
+    data_collection_item = CollectionItemCreate(
+        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    )
+    mdl_collection_item = await create_collection_item(
+        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    )
+
+    data_wearing_1 = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-10-28T10:00:00+03:00"),
+        rating=9,
+    )
+    mdl_wearing_1 = await create_wearing(
+        session_factory, mdl_collection_item.id, data_wearing_1
+    )
+
+    data_wearing_2 = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-11-01T12:00:00+03:00"),
+        rating=9,
+    )
+    mdl_wearing_2 = await create_wearing(
+        session_factory, mdl_collection_item.id, data_wearing_2
+    )
+
+    data_wearing_3 = WearingCreate(
+        worn_at=datetime.fromisoformat("2026-11-05T10:00:00+03:00"),
+        rating=9,
+    )
+    await create_wearing(session_factory, mdl_collection_item.id, data_wearing_3)
+
+    t_zone = timezone(timedelta(hours=3))
+    t_from = datetime(2026, 10, 28, 10, 0, tzinfo=t_zone)
+    t_before = datetime(2026, 11, 5, 10, 0, tzinfo=t_zone)
+
+    wearings = await list_wearings(
+        session_factory,
+        mdl_collection_item.id,
+        worn_from=t_from,
+        worn_before=t_before,
+    )
+
+    assert wearings == [mdl_wearing_2, mdl_wearing_1]
 
 
 @pytest.mark.anyio

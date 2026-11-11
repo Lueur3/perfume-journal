@@ -313,6 +313,25 @@ Responses:
   another wearing;
 - `422 Unprocessable Content` — the request body is invalid.
 
+### `GET /collection-items/{collection_item_id}/wearings`
+
+Lists wearings for one active or archived collection item, newest first by
+`worn_at`. The optional query parameters `worn_from` (inclusive) and
+`worn_before` (exclusive) accept timestamps with `Z` or a numeric UTC
+offset. Each bound can be used on its own. Omitting both returns the full
+history.
+
+Example for November 5 in UTC:
+
+```text
+GET /collection-items/1/wearings?worn_from=2026-11-05T00:00:00Z&worn_before=2026-11-06T00:00:00Z
+```
+
+- `200 OK` returns an array of wearings or `[]` if none match.
+- `404 Not Found` indicates that the collection item does not exist.
+- `422 Unprocessable Content` indicates an invalid timestamp, a missing
+  timezone offset, or a start after the end.
+
 ### `DELETE /wearings/{wearing_id}`
 
 Permanently deletes one wearing, including from an archived item. The item's
