@@ -38,13 +38,16 @@ def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
     return cast(async_sessionmaker[AsyncSession], request.app.state.session_factory)
 
 
+SessionFactoryDep = Annotated[
+    async_sessionmaker[AsyncSession],
+    Depends(get_session_factory),
+]
+
+
 @app.post("/perfumes", response_model=mdl.Perfume, status_code=status.HTTP_201_CREATED)
 async def create_perfume(
     body: mdl.PerfumeCreate,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession],
-        Depends(get_session_factory),
-    ],
+    session_factory: SessionFactoryDep,
 ) -> mdl.Perfume:
     try:
         return await sql_store.create_perfume(session_factory, body)
@@ -62,10 +65,7 @@ async def create_perfume(
 async def create_collection_item(
     perfume_id: int,
     body: mdl.CollectionItemCreate,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession],
-        Depends(get_session_factory),
-    ],
+    session_factory: SessionFactoryDep,
 ) -> mdl.CollectionItem:
     try:
         return await sql_store.create_collection_item(session_factory, perfume_id, body)
@@ -83,10 +83,7 @@ async def create_collection_item(
 async def create_wearing(
     collection_item_id: int,
     body: mdl.WearingCreate,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession],
-        Depends(get_session_factory),
-    ],
+    session_factory: SessionFactoryDep,
 ) -> mdl.Wearing:
     try:
         return await sql_store.create_wearing(session_factory, collection_item_id, body)
@@ -107,10 +104,7 @@ async def create_wearing(
 )
 async def list_wearings(
     collection_item_id: int,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession],
-        Depends(get_session_factory),
-    ],
+    session_factory: SessionFactoryDep,
     worn_from: AwareDatetime | None = None,
     worn_before: AwareDatetime | None = None,
 ) -> list[mdl.Wearing]:
@@ -140,10 +134,7 @@ async def list_wearings(
 )
 async def get_perfume(
     perfume_id: int,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession],
-        Depends(get_session_factory),
-    ],
+    session_factory: SessionFactoryDep,
 ) -> mdl.PerfumeDetails:
     try:
         return await sql_store.get_perfume_details(session_factory, perfume_id)
@@ -160,9 +151,7 @@ async def get_perfume(
 )
 async def update_perfume(
     perfume_id: int,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession], Depends(get_session_factory)
-    ],
+    session_factory: SessionFactoryDep,
     body: mdl.PerfumeCreate,
 ) -> mdl.Perfume:
     try:
@@ -179,9 +168,7 @@ async def update_perfume(
 
 @app.get("/perfumes", response_model=list[mdl.Perfume], status_code=status.HTTP_200_OK)
 async def list_perfumes(
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession], Depends(get_session_factory)
-    ],
+    session_factory: SessionFactoryDep,
     q: str | None = None,
 ) -> list[mdl.Perfume]:
     return await sql_store.list_perfumes(session_factory, q=q)
@@ -194,9 +181,7 @@ async def list_perfumes(
 )
 async def set_collection_item_status(
     collection_item_id: int,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession], Depends(get_session_factory)
-    ],
+    session_factory: SessionFactoryDep,
     body: mdl.CollectionItemStatusUpdate,
 ) -> mdl.CollectionItem:
     try:
@@ -215,9 +200,7 @@ async def set_collection_item_status(
     status_code=status.HTTP_200_OK,
 )
 async def list_collection_items(
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession], Depends(get_session_factory)
-    ],
+    session_factory: SessionFactoryDep,
     status: mdl.CollectionItemStatus = "active",
 ) -> list[mdl.CollectionItem]:
     return await sql_store.list_collection_items(session_factory, status)
@@ -229,13 +212,10 @@ async def list_collection_items(
 )
 async def delete_collection_item(
     collection_item_id: int,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession], Depends(get_session_factory)
-    ],
+    session_factory: SessionFactoryDep,
 ) -> None:
     try:
         await sql_store.delete_collection_item(session_factory, collection_item_id)
-
     except CollectionItemNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
@@ -249,9 +229,7 @@ async def delete_collection_item(
 @app.delete("/perfumes/{perfume_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_perfume(
     perfume_id: int,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession], Depends(get_session_factory)
-    ],
+    session_factory: SessionFactoryDep,
 ) -> None:
     try:
         await sql_store.delete_perfume(session_factory, perfume_id)
@@ -268,9 +246,7 @@ async def delete_perfume(
 @app.delete("/wearings/{wearing_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_wearing(
     wearing_id: int,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession], Depends(get_session_factory)
-    ],
+    session_factory: SessionFactoryDep,
 ) -> None:
     try:
         await sql_store.delete_wearing(session_factory, wearing_id)

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 
 from sqlalchemy import or_, select
@@ -16,6 +17,16 @@ from perfume_journal.errors import (
     WearingNotFoundError,
 )
 from perfume_journal.normalization import create_key
+
+
+def _matches_integrity_error(
+    exc: IntegrityError, expected_sqlstate: str, expected_constraint_name: str
+) -> bool:
+    driver_error = exc.driver_exception
+    sqlstate = getattr(driver_error, "sqlstate", None)
+    constraint_name = getattr(driver_error, "constraint_name", None)
+
+    return sqlstate == expected_sqlstate and constraint_name == expected_constraint_name
 
 
 async def create_perfume(
@@ -50,14 +61,7 @@ async def create_perfume(
         return mdl_perfume
 
     except IntegrityError as exc:
-        driver_error = exc.driver_exception
-        sqlstate = getattr(driver_error, "sqlstate", None)
-        constraint_name = getattr(driver_error, "constraint_name", None)
-
-        if (
-            sqlstate == "23505"
-            and constraint_name == "uq_brand_name_concentration_keys"
-        ):
+        if _matches_integrity_error(exc, "23505", "uq_brand_name_concentration_keys"):
             raise DuplicatePerfumeError("This perfume already exists.") from exc
         else:
             raise
@@ -163,15 +167,16 @@ async def get_perfume_details(
         result_wearing_query = await session.execute(statement_wering)
         orm_wearings = result_wearing_query.scalars().all()
 
+    wearings_by_items_id: dict[int, list[mdl.Wearing]] = defaultdict(list)
+    for wearing in orm_wearings:
+        wearings_by_items_id[wearing.collection_item_id].append(
+            mdl.Wearing.model_validate(wearing, from_attributes=True)
+        )
+
     collection_items_details_list = []
 
     for item in orm_collection_items:
-        wearing_list = []
-        for wearing in orm_wearings:
-            if wearing.collection_item_id == item.id:
-                mdl_wearing = mdl.Wearing.model_validate(wearing, from_attributes=True)
-                wearing_list.append(mdl_wearing)
-
+        wearing_list = wearings_by_items_id.get(item.id, [])
         mdl_item = mdl.CollectionItem.model_validate(item, from_attributes=True)
         collection_items_details = mdl.CollectionItemDetails(
             **mdl_item.model_dump(), wearings=wearing_list
@@ -219,14 +224,7 @@ async def update_perfume(
         return result
 
     except IntegrityError as exc:
-        driver_error = exc.driver_exception
-        sqlstate = getattr(driver_error, "sqlstate", None)
-        constraint_name = getattr(driver_error, "constraint_name", None)
-
-        if (
-            sqlstate == "23505"
-            and constraint_name == "uq_brand_name_concentration_keys"
-        ):
+        if _matches_integrity_error(exc, "23505", "uq_brand_name_concentration_keys"):
             raise DuplicatePerfumeError("This perfume already exists.") from exc
         else:
             raise
@@ -332,14 +330,7 @@ async def delete_collection_item(
             await session.flush()
 
     except IntegrityError as exc:
-        driver_error = exc.driver_exception
-        sqlstate = getattr(driver_error, "sqlstate", None)
-        constraint_name = getattr(driver_error, "constraint_name", None)
-
-        if (
-            sqlstate == "23001"
-            and constraint_name == "wearings_collection_item_id_fkey"
-        ):
+        if _matches_integrity_error(exc, "23001", "wearings_collection_item_id_fkey"):
             raise CollectionItemHasWearingsError(
                 "Cannot delete a collection item with wearing history."
             ) from exc
@@ -362,14 +353,7 @@ async def delete_perfume(
             await session.flush()
 
     except IntegrityError as exc:
-        driver_error = exc.driver_exception
-        sqlstate = getattr(driver_error, "sqlstate", None)
-        constraint_name = getattr(driver_error, "constraint_name", None)
-
-        if (
-            sqlstate == "23001"
-            and constraint_name == "collection_items_perfume_id_fkey"
-        ):
+        if _matches_integrity_error(exc, "23001", "collection_items_perfume_id_fkey"):
             raise PerfumeHasCollectionItemsError(
                 "Cannot delete a perfume with collection items."
             ) from exc

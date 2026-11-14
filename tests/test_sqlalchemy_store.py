@@ -50,27 +50,24 @@ async def test_create_perfume(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     data = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
-    mdl_perfume = await create_perfume(session_factory, data)
+    perfume = await create_perfume(session_factory, data)
 
-    assert mdl_perfume.id > 0
-    assert mdl_perfume.brand == "Creed"
-    assert mdl_perfume.name == "Aventus"
-    assert mdl_perfume.concentration == "EDP"
+    assert perfume.id > 0
+    assert perfume.brand == "Creed"
+    assert perfume.name == "Aventus"
+    assert perfume.concentration == "EDP"
 
     async with session_factory() as session:
-        statement = select(PerfumeRow).where(PerfumeRow.id == mdl_perfume.id)
+        statement = select(PerfumeRow).where(PerfumeRow.id == perfume.id)
         result = await session.execute(statement)
-        row_perfume = result.scalar_one()
+        perfume_row = result.scalar_one()
 
-        assert row_perfume.brand == "Creed"
-        assert row_perfume.name == "Aventus"
-        assert row_perfume.concentration == "EDP"
-        assert row_perfume.brand_key == "creed"
-        assert row_perfume.name_key == "aventus"
-        assert row_perfume.concentration_key == "edp"
-        assert row_perfume.brand == mdl_perfume.brand
-        assert row_perfume.name == mdl_perfume.name
-        assert row_perfume.concentration == mdl_perfume.concentration
+        assert perfume_row.brand == "Creed"
+        assert perfume_row.name == "Aventus"
+        assert perfume_row.concentration == "EDP"
+        assert perfume_row.brand_key == "creed"
+        assert perfume_row.name_key == "aventus"
+        assert perfume_row.concentration_key == "edp"
 
 
 @pytest.mark.anyio
@@ -83,7 +80,7 @@ async def test_duplicate_perfume(
     expected_concentration_key: str | None,
 ) -> None:
     data = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration=concentration)
-    mdl_perfume = await create_perfume(session_factory, data)
+    perfume = await create_perfume(session_factory, data)
 
     duplicate_data = PerfumeCreate(
         brand="tom   ford", name="OUD  WOOD", concentration=concentration
@@ -94,30 +91,28 @@ async def test_duplicate_perfume(
     async with session_factory() as session:
         statement = select(PerfumeRow)
         result = await session.execute(statement)
-        row_perfume = result.scalar_one()
+        perfume_row = result.scalar_one()
 
-        assert row_perfume.id == mdl_perfume.id
-        assert row_perfume.brand == mdl_perfume.brand
-        assert row_perfume.name == mdl_perfume.name
-        assert row_perfume.concentration == concentration
-        assert row_perfume.concentration_key == expected_concentration_key
-        assert row_perfume.brand == "Tom Ford"
-        assert row_perfume.name == "Oud Wood"
-        assert row_perfume.brand_key == "tom ford"
-        assert row_perfume.name_key == "oud wood"
+        assert perfume_row.id == perfume.id
+        assert perfume_row.brand == "Tom Ford"
+        assert perfume_row.name == "Oud Wood"
+        assert perfume_row.concentration == concentration
+        assert perfume_row.concentration_key == expected_concentration_key
+        assert perfume_row.brand_key == "tom ford"
+        assert perfume_row.name_key == "oud wood"
 
 
 @pytest.mark.anyio
-async def test_diff_concentrations(
+async def test_create_perfume_different_concentrations(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume_1 = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    perfume_1 = await create_perfume(session_factory, data_perfume_1)
+    first_data = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    first_perfume = await create_perfume(session_factory, first_data)
 
-    data_perfume_2 = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
-    perfume_2 = await create_perfume(session_factory, data_perfume_2)
+    second_data = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
+    second_perfume = await create_perfume(session_factory, second_data)
 
-    assert perfume_1.id != perfume_2.id
+    assert first_perfume.id != second_perfume.id
 
     async with session_factory() as session:
         statement = select(PerfumeRow)
@@ -125,7 +120,7 @@ async def test_diff_concentrations(
         results = result_query.scalars().all()
 
     assert len(results) == 2
-    assert {row.id for row in results} == {perfume_1.id, perfume_2.id}
+    assert {row.id for row in results} == {first_perfume.id, second_perfume.id}
     assert {row.concentration for row in results} == {"EDT", "EDP"}
 
 
@@ -148,34 +143,27 @@ async def test_create_perfume_preserves_other_integrity_errors(
     async with session_factory() as session:
         statement = select(PerfumeRow)
         result = await session.execute(statement)
-        row_perfume = result.scalar_one_or_none()
+        perfume_row = result.scalar_one_or_none()
 
-        assert row_perfume is None
+        assert perfume_row is None
 
 
 @pytest.mark.anyio
-async def test_correct_read_perfume(
+async def test_get_perfume_by_id(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
-    await create_perfume(session_factory, data)
-    data_2 = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT")
-    mdl_perfume_2 = await create_perfume(session_factory, data_2)
+    first_data = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
+    await create_perfume(session_factory, first_data)
+    target_data = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT")
+    target_perfume = await create_perfume(session_factory, target_data)
 
-    result = await get_perfume(session_factory, mdl_perfume_2.id)
+    result = await get_perfume(session_factory, target_perfume.id)
 
-    assert result.id > 0
-    assert result.id == mdl_perfume_2.id
-    assert result.brand == mdl_perfume_2.brand
-    assert result.name == mdl_perfume_2.name
-    assert result.concentration == mdl_perfume_2.concentration
-    assert result.brand == "Tom Ford"
-    assert result.name == "Oud Wood"
-    assert result.concentration == "EDT"
+    assert result == target_perfume
 
 
 @pytest.mark.anyio
-async def test_not_found_perfume_error(
+async def test_get_perfume_not_found(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     with pytest.raises(PerfumeNotFoundError):
@@ -186,336 +174,310 @@ async def test_not_found_perfume_error(
 async def test_create_collection_item(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP"),
+    )
+    item_data = CollectionItemCreate(
         kind="sample", initial_volume_ml=2.0, acquired_on=date(2026, 10, 19)
     )
+    item = await create_collection_item(session_factory, perfume.id, item_data)
 
-    mdl_collection_item = await create_collection_item(
-        session_factory, mdl_perfume.id, data_collection_item
-    )
-
-    assert mdl_collection_item.id > 0
-    assert mdl_collection_item.perfume_id == mdl_perfume.id
-    assert mdl_collection_item.kind == "sample"
-    assert mdl_collection_item.initial_volume_ml == 2.0
-    assert mdl_collection_item.acquired_on == date(2026, 10, 19)
-    assert mdl_collection_item.status == "active"
+    assert item.id > 0
+    assert item.perfume_id == perfume.id
+    assert item.kind == "sample"
+    assert item.initial_volume_ml == 2.0
+    assert item.acquired_on == date(2026, 10, 19)
+    assert item.status == "active"
 
     async with session_factory() as session:
-        statement = select(CollectionItemRow).where(
-            CollectionItemRow.id == mdl_collection_item.id
-        )
+        statement = select(CollectionItemRow).where(CollectionItemRow.id == item.id)
         result = await session.execute(statement)
-        row_collection_item = result.scalar_one()
+        item_row = result.scalar_one()
 
-        assert row_collection_item.id > 0
-        assert row_collection_item.perfume_id == mdl_perfume.id
-        assert row_collection_item.kind == "sample"
-        assert row_collection_item.initial_volume_ml == 2.0
-        assert row_collection_item.acquired_on == date(2026, 10, 19)
-        assert row_collection_item.status == "active"
+        assert item_row.id == item.id
+        assert item_row.perfume_id == perfume.id
+        assert item_row.kind == "sample"
+        assert item_row.initial_volume_ml == 2.0
+        assert item_row.acquired_on == date(2026, 10, 19)
+        assert item_row.status == "active"
 
 
 @pytest.mark.anyio
-async def test_no_perfume_for_collection_item(
+async def test_create_collection_item_missing_perfume_raises_not_found(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_collection_item = CollectionItemCreate(
+    item_data = CollectionItemCreate(
         kind="sample", initial_volume_ml=2.0, acquired_on=date(2026, 10, 19)
     )
 
     with pytest.raises(PerfumeNotFoundError):
-        await create_collection_item(
-            session_factory, perfume_id=999, data=data_collection_item
-        )
+        await create_collection_item(session_factory, perfume_id=999, data=item_data)
 
     async with session_factory() as session:
         statement = select(CollectionItemRow)
-        query_result = await session.execute(statement)
-        result = query_result.scalar_one_or_none()
-
-        assert result is None
+        result = await session.execute(statement)
+        assert result.scalar_one_or_none() is None
 
 
 @pytest.mark.anyio
-async def test_equal_collection_item(
+async def test_create_multiple_identical_collection_items(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(kind="sample")
-    mdl_collection_item_1 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP"),
     )
-    mdl_collection_item_2 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    item_data = CollectionItemCreate(kind="sample")
+    first_item = await create_collection_item(
+        session_factory, perfume_id=perfume.id, data=item_data
+    )
+    second_item = await create_collection_item(
+        session_factory, perfume_id=perfume.id, data=item_data
     )
 
-    assert mdl_collection_item_1.id > 0
-    assert mdl_collection_item_1.perfume_id == mdl_perfume.id
-    assert mdl_collection_item_1.kind == "sample"
-    assert mdl_collection_item_1.initial_volume_ml is None
-    assert mdl_collection_item_1.acquired_on is None
-    assert mdl_collection_item_1.status == "active"
+    assert first_item.id > 0
+    assert first_item.perfume_id == perfume.id
+    assert first_item.kind == "sample"
+    assert first_item.initial_volume_ml is None
+    assert first_item.acquired_on is None
+    assert first_item.status == "active"
 
-    assert mdl_collection_item_2.id > 0
-    assert mdl_collection_item_2.perfume_id == mdl_perfume.id
-    assert mdl_collection_item_2.kind == "sample"
-    assert mdl_collection_item_2.initial_volume_ml is None
-    assert mdl_collection_item_2.acquired_on is None
-    assert mdl_collection_item_2.status == "active"
+    assert second_item.id > 0
+    assert second_item.perfume_id == perfume.id
+    assert second_item.kind == "sample"
+    assert second_item.initial_volume_ml is None
+    assert second_item.acquired_on is None
+    assert second_item.status == "active"
+
+    assert first_item.id != second_item.id
 
     async with session_factory() as session:
         statement = select(CollectionItemRow)
-        query_result = await session.execute(statement)
-        results = query_result.scalars().all()
+        result = await session.execute(statement)
+        results = result.scalars().all()
 
-        assert len(results) == 2
-        assert mdl_collection_item_1.id != mdl_collection_item_2.id
-        assert {row.id for row in results} == {
-            mdl_collection_item_1.id,
-            mdl_collection_item_2.id,
-        }
+    assert len(results) == 2
+    assert {row.id for row in results} == {first_item.id, second_item.id}
 
 
 @pytest.mark.anyio
 async def test_create_wearing(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP"),
+    )
+    item_data = CollectionItemCreate(
         kind="sample", initial_volume_ml=2.0, acquired_on=date(2026, 10, 19)
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, mdl_perfume.id, data_collection_item
-    )
+    item = await create_collection_item(session_factory, perfume.id, item_data)
 
-    data_wearing = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+    expected_worn_at = datetime(
+        2026, 10, 2, 9, 30, 0, tzinfo=timezone(timedelta(hours=3))
+    )
+    wearing_data = WearingCreate(
+        worn_at=expected_worn_at,
         rating=7,
         comment="Test comment",
     )
-    mdl_wearing = await create_wearing(
-        session_factory, collection_item_id=mdl_collection_item.id, data=data_wearing
+    wearing = await create_wearing(
+        session_factory, collection_item_id=item.id, data=wearing_data
     )
 
-    assert mdl_wearing.id > 0
-    assert mdl_wearing.collection_item_id == mdl_collection_item.id
-    expected_zone = timezone(timedelta(hours=3))
-    expected_date = datetime(2026, 10, 2, 9, 30, 0, tzinfo=expected_zone)
-    assert mdl_wearing.worn_at == expected_date
-    assert mdl_wearing.rating == 7
-    assert mdl_wearing.comment == "Test comment"
+    assert wearing.id > 0
+    assert wearing.collection_item_id == item.id
+    assert wearing.worn_at == expected_worn_at
+    assert wearing.rating == 7
+    assert wearing.comment == "Test comment"
 
     async with session_factory() as session:
-        statement = select(WearingRow).where(
-            WearingRow.collection_item_id == mdl_collection_item.id
-        )
-        query_result = await session.execute(statement)
-        result = query_result.scalar_one()
+        statement = select(WearingRow).where(WearingRow.collection_item_id == item.id)
+        result = await session.execute(statement)
+        wearing_row = result.scalar_one()
 
-        assert result.id == mdl_wearing.id
-        assert result.id > 0
-        assert result.collection_item_id == mdl_collection_item.id
-        expected_date = datetime.fromisoformat("2026-10-02T09:30:00+03:00")
-        assert result.worn_at == expected_date
-        assert result.rating == 7
-        assert result.comment == "Test comment"
-        assert result.worn_at == mdl_wearing.worn_at
-        assert result.rating == mdl_wearing.rating
-        assert result.comment == mdl_wearing.comment
+        assert wearing_row.id == wearing.id
+        assert wearing_row.collection_item_id == item.id
+        assert wearing_row.worn_at == expected_worn_at
+        assert wearing_row.rating == 7
+        assert wearing_row.comment == "Test comment"
 
 
 @pytest.mark.anyio
-async def test_no_collection_item_for_wearing(
+async def test_create_wearing_missing_item_raises_not_found(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_wearing = WearingCreate(
+    wearing_data = WearingCreate(
         worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
         rating=7,
         comment="Test comment",
     )
 
     with pytest.raises(CollectionItemNotFoundError):
-        await create_wearing(session_factory, collection_item_id=999, data=data_wearing)
+        await create_wearing(session_factory, collection_item_id=999, data=wearing_data)
 
     async with session_factory() as session:
         statement = select(WearingRow)
-        query_result = await session.execute(statement)
-        result = query_result.scalar_one_or_none()
-
-        assert result is None
+        result = await session.execute(statement)
+        assert result.scalar_one_or_none() is None
 
 
 @pytest.mark.anyio
-async def test_equal_wearing(
+async def test_create_multiple_identical_wearings(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(kind="sample")
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDP"),
+    )
+    item_data = CollectionItemCreate(kind="sample")
+    item = await create_collection_item(
+        session_factory, perfume_id=perfume.id, data=item_data
     )
 
-    data_wearing = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+    expected_worn_at = datetime.fromisoformat("2026-10-02T09:30:00+03:00")
+    wearing_data = WearingCreate(worn_at=expected_worn_at)
+    first_wearing = await create_wearing(
+        session_factory, collection_item_id=item.id, data=wearing_data
     )
-    mdl_wearing_1 = await create_wearing(
-        session_factory, collection_item_id=mdl_collection_item.id, data=data_wearing
-    )
-    mdl_wearing_2 = await create_wearing(
-        session_factory, collection_item_id=mdl_collection_item.id, data=data_wearing
+    second_wearing = await create_wearing(
+        session_factory, collection_item_id=item.id, data=wearing_data
     )
 
-    assert mdl_wearing_1.id > 0
-    assert mdl_wearing_1.collection_item_id == mdl_collection_item.id
-    expected_date = datetime.fromisoformat("2026-10-02T09:30:00+03:00")
-    assert mdl_wearing_1.worn_at == expected_date
-    assert mdl_wearing_1.rating is None
-    assert mdl_wearing_1.comment is None
+    assert first_wearing.id > 0
+    assert first_wearing.collection_item_id == item.id
+    assert first_wearing.worn_at == expected_worn_at
+    assert first_wearing.rating is None
+    assert first_wearing.comment is None
 
-    assert mdl_wearing_2.id > 0
-    assert mdl_wearing_2.collection_item_id == mdl_collection_item.id
-    assert mdl_wearing_2.worn_at == expected_date
-    assert mdl_wearing_2.rating is None
-    assert mdl_wearing_2.comment is None
+    assert second_wearing.id > 0
+    assert second_wearing.collection_item_id == item.id
+    assert second_wearing.worn_at == expected_worn_at
+    assert second_wearing.rating is None
+    assert second_wearing.comment is None
+
+    assert first_wearing.id != second_wearing.id
 
     async with session_factory() as session:
         statement = select(WearingRow)
-        query_result = await session.execute(statement)
-        results = query_result.scalars().all()
+        result = await session.execute(statement)
+        results = result.scalars().all()
 
-        assert len(results) == 2
-        assert mdl_wearing_1.id != mdl_wearing_2.id
-        assert {row.id for row in results} == {
-            mdl_wearing_1.id,
-            mdl_wearing_2.id,
-        }
-        for result in results:
-            assert result.collection_item_id == mdl_collection_item.id
-            assert result.worn_at == expected_date
-            assert result.rating is None
-            assert result.comment is None
+    assert len(results) == 2
+    assert {row.id for row in results} == {first_wearing.id, second_wearing.id}
+    for row in results:
+        assert row.collection_item_id == item.id
+        assert row.worn_at == expected_worn_at
+        assert row.rating is None
+        assert row.comment is None
 
 
 @pytest.mark.anyio
-async def test_create_perfume_details(
+async def test_get_perfume_details_includes_wearings_and_average_rating(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item_1 = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
-    )
-    data_collection_item_2 = CollectionItemCreate(
-        kind="bottle", initial_volume_ml=200, acquired_on=date(2026, 9, 20)
-    )
-
-    mdl_collection_item_1 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item_1
-    )
-    mdl_collection_item_2 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item_2
-    )
-
-    data_wearing_1 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
-        rating=10,
-        comment="Test comment",
-    )
-    data_wearing_2 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
-        rating=8,
-        comment="Test comment",
-    )
-    data_wearing_3 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
-        rating=4,
-        comment="Test comment",
-    )
-    data_wearing_4 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
-    )
-
-    mdl_wearing_1 = await create_wearing(
+    perfume = await create_perfume(
         session_factory,
-        collection_item_id=mdl_collection_item_1.id,
-        data=data_wearing_1,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_wearing_2 = await create_wearing(
+    first_item = await create_collection_item(
         session_factory,
-        collection_item_id=mdl_collection_item_1.id,
-        data=data_wearing_2,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
-    mdl_wearing_3 = await create_wearing(
+    second_item = await create_collection_item(
         session_factory,
-        collection_item_id=mdl_collection_item_2.id,
-        data=data_wearing_3,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="bottle", initial_volume_ml=200, acquired_on=date(2026, 9, 20)
+        ),
     )
-    mdl_wearing_4 = await create_wearing(
+
+    first_wearing = await create_wearing(
         session_factory,
-        collection_item_id=mdl_collection_item_2.id,
-        data=data_wearing_4,
+        collection_item_id=first_item.id,
+        data=WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+            rating=10,
+            comment="Test comment",
+        ),
+    )
+    second_wearing = await create_wearing(
+        session_factory,
+        collection_item_id=first_item.id,
+        data=WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+            rating=8,
+            comment="Test comment",
+        ),
+    )
+    third_wearing = await create_wearing(
+        session_factory,
+        collection_item_id=second_item.id,
+        data=WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+            rating=4,
+            comment="Test comment",
+        ),
+    )
+    fourth_wearing = await create_wearing(
+        session_factory,
+        collection_item_id=second_item.id,
+        data=WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+        ),
     )
 
-    perfume_details = await get_perfume_details(
-        session_factory, perfume_id=mdl_perfume.id
-    )
+    details = await get_perfume_details(session_factory, perfume_id=perfume.id)
 
-    items_by_id = {item.id: item for item in perfume_details.collection_items}
-    sample_1 = items_by_id[mdl_collection_item_1.id]
-    sample_2 = items_by_id[mdl_collection_item_2.id]
-
-    wearings_by_id_1 = {wearing.id: wearing for wearing in sample_1.wearings}
-
-    assert wearings_by_id_1 == {
-        mdl_wearing_1.id: mdl_wearing_1,
-        mdl_wearing_2.id: mdl_wearing_2,
-    }
-
-    wearings_by_id_2 = {wearing.id: wearing for wearing in sample_2.wearings}
-
-    assert wearings_by_id_2 == {
-        mdl_wearing_3.id: mdl_wearing_3,
-        mdl_wearing_4.id: mdl_wearing_4,
-    }
-
-    assert perfume_details.average_rating == pytest.approx(22 / 3)
+    items_by_id = {item.id: item for item in details.collection_items}
     assert len(items_by_id) == 2
-    assert len(sample_1.wearings) == 2
-    assert len(sample_2.wearings) == 2
-    assert perfume_details.id > 0
-    assert perfume_details.id == mdl_perfume.id
-    assert perfume_details.brand == mdl_perfume.brand
-    assert perfume_details.name == mdl_perfume.name
-    assert perfume_details.concentration == mdl_perfume.concentration
+
+    first_item_details = items_by_id[first_item.id]
+    second_item_details = items_by_id[second_item.id]
+
+    assert len(first_item_details.wearings) == 2
+    wearings_by_id_1 = {wearing.id: wearing for wearing in first_item_details.wearings}
+    assert wearings_by_id_1 == {
+        first_wearing.id: first_wearing,
+        second_wearing.id: second_wearing,
+    }
+
+    assert len(second_item_details.wearings) == 2
+    wearings_by_id_2 = {wearing.id: wearing for wearing in second_item_details.wearings}
+    assert wearings_by_id_2 == {
+        third_wearing.id: third_wearing,
+        fourth_wearing.id: fourth_wearing,
+    }
+
+    assert details.average_rating == pytest.approx(22 / 3)
+    assert details.id == perfume.id
+    assert details.brand == perfume.brand
+    assert details.name == perfume.name
+    assert details.concentration == perfume.concentration
 
 
 @pytest.mark.anyio
-async def test_perfume_no_collection_items(
+async def test_get_perfume_details_without_collection_items(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
+    )
 
-    result = await get_perfume_details(session_factory, perfume_id=mdl_perfume.id)
+    details = await get_perfume_details(session_factory, perfume_id=perfume.id)
 
-    assert result.id == mdl_perfume.id
-    assert result.collection_items == []
-    assert result.average_rating is None
+    assert details.id == perfume.id
+    assert details.collection_items == []
+    assert details.average_rating is None
 
 
 @pytest.mark.anyio
-async def test_not_exists_perfume(
+async def test_get_perfume_details_not_found(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     with pytest.raises(PerfumeNotFoundError):
@@ -523,312 +485,306 @@ async def test_not_exists_perfume(
 
 
 @pytest.mark.anyio
-async def test_perfume_no_rating(
+async def test_get_perfume_details_without_ratings(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item_1 = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item_1 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item_1
+    first_item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
+    )
+    second_item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="bottle", initial_volume_ml=200, acquired_on=date(2026, 9, 20)
+        ),
+    )
+    wearing = await create_wearing(
+        session_factory,
+        second_item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+        ),
     )
 
-    data_collection_item_2 = CollectionItemCreate(
-        kind="bottle", initial_volume_ml=200, acquired_on=date(2026, 9, 20)
-    )
-    mdl_collection_item_2 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item_2
-    )
+    details = await get_perfume_details(session_factory, perfume.id)
 
-    data_wearing = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
-    )
-    mdl_wearing = await create_wearing(
-        session_factory, mdl_collection_item_2.id, data_wearing
-    )
+    assert details.average_rating is None
+    assert len(details.collection_items) == 2
 
-    perfume_details = await get_perfume_details(session_factory, mdl_perfume.id)
-
-    assert perfume_details.average_rating is None
-    assert len(perfume_details.collection_items) == 2
-
-    items_by_id = {item.id: item for item in perfume_details.collection_items}
-    sample_1 = items_by_id[mdl_collection_item_1.id]
-    sample_2 = items_by_id[mdl_collection_item_2.id]
-
-    assert sample_1.wearings == []
-    assert len(sample_2.wearings) == 1
-    assert sample_2.wearings[0] == mdl_wearing
+    items_by_id = {item.id: item for item in details.collection_items}
+    assert items_by_id[first_item.id].wearings == []
+    assert items_by_id[second_item.id].wearings == [wearing]
 
 
 @pytest.mark.anyio
 async def test_perfume_details_isolation(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume_1 = PerfumeCreate(brand="Dior", name="Sauvage", concentration="EDT")
-    mdl_perfume_1 = await create_perfume(session_factory, data_perfume_1)
-
-    data_item_1 = CollectionItemCreate(kind="bottle", initial_volume_ml=100)
-    mdl_item_1 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume_1.id, data=data_item_1
+    first_perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Dior", name="Sauvage", concentration="EDT"),
+    )
+    first_item = await create_collection_item(
+        session_factory,
+        perfume_id=first_perfume.id,
+        data=CollectionItemCreate(kind="bottle", initial_volume_ml=100),
+    )
+    await create_wearing(
+        session_factory,
+        first_item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-01T12:00:00+03:00"),
+            rating=2,
+        ),
     )
 
-    data_wearing_1 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-01T12:00:00+03:00"),
-        rating=2,
+    second_perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Chanel", name="Bleu de Chanel", concentration="EDP"),
     )
-    await create_wearing(session_factory, mdl_item_1.id, data_wearing_1)
-
-    data_perfume_2 = PerfumeCreate(
-        brand="Chanel", name="Bleu de Chanel", concentration="EDP"
+    second_item = await create_collection_item(
+        session_factory,
+        perfume_id=second_perfume.id,
+        data=CollectionItemCreate(kind="sample", initial_volume_ml=10),
     )
-    mdl_perfume_2 = await create_perfume(session_factory, data_perfume_2)
-
-    data_item_2 = CollectionItemCreate(kind="sample", initial_volume_ml=10)
-    mdl_item_2 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume_2.id, data=data_item_2
+    second_wearing = await create_wearing(
+        session_factory,
+        second_item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T15:00:00+03:00"),
+            rating=9,
+        ),
     )
 
-    data_wearing_2 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T15:00:00+03:00"),
-        rating=9,
-    )
-    mdl_wearing_2 = await create_wearing(session_factory, mdl_item_2.id, data_wearing_2)
+    details = await get_perfume_details(session_factory, second_perfume.id)
 
-    perfume_details = await get_perfume_details(session_factory, mdl_perfume_2.id)
+    assert details.id == second_perfume.id
+    assert details.average_rating == 9.0
+    assert len(details.collection_items) == 1
 
-    assert perfume_details.id == mdl_perfume_2.id
-    assert perfume_details.average_rating == 9.0
-    assert len(perfume_details.collection_items) == 1
-
-    item = perfume_details.collection_items[0]
-    assert item.id == mdl_item_2.id
+    item = details.collection_items[0]
+    assert item.id == second_item.id
     assert len(item.wearings) == 1
-    assert item.wearings[0].id == mdl_wearing_2.id
+    assert item.wearings[0].id == second_wearing.id
     assert item.wearings[0].rating == 9
 
 
 @pytest.mark.anyio
-async def test_correct_perfume_update(
+async def test_update_perfume(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
+    original_perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
+    )
 
-    new_data = PerfumeCreate(brand="Tom Ford", name="Oud Wood")
-    new_mdl_perfume = await update_perfume(session_factory, mdl_perfume.id, new_data)
+    update_data = PerfumeCreate(brand="Tom Ford", name="Oud Wood")
+    updated_perfume = await update_perfume(
+        session_factory, original_perfume.id, update_data
+    )
 
-    assert new_mdl_perfume.id == mdl_perfume.id
-    assert new_mdl_perfume.brand == "Tom Ford"
-    assert new_mdl_perfume.name == "Oud Wood"
-    assert new_mdl_perfume.concentration is None
+    assert updated_perfume.id == original_perfume.id
+    assert updated_perfume.brand == "Tom Ford"
+    assert updated_perfume.name == "Oud Wood"
+    assert updated_perfume.concentration is None
 
     async with session_factory() as session:
-        stmt = select(PerfumeRow).where(PerfumeRow.id == mdl_perfume.id)
-        res_query = await session.execute(stmt)
-        result = res_query.scalar_one()
+        statement = select(PerfumeRow).where(PerfumeRow.id == original_perfume.id)
+        result = await session.execute(statement)
+        perfume_row = result.scalar_one()
 
-        assert result.brand == "Tom Ford"
-        assert result.name == "Oud Wood"
-        assert result.concentration is None
-        assert result.brand_key == "tom ford"
-        assert result.name_key == "oud wood"
-        assert result.concentration_key is None
+        assert perfume_row.brand == "Tom Ford"
+        assert perfume_row.name == "Oud Wood"
+        assert perfume_row.concentration is None
+        assert perfume_row.brand_key == "tom ford"
+        assert perfume_row.name_key == "oud wood"
+        assert perfume_row.concentration_key is None
 
 
 @pytest.mark.anyio
-async def test_conflict_perfume_update(
+async def test_update_perfume_duplicate_raises_conflict(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume_1 = PerfumeCreate(brand="Tom Ford", name="Oud Wood")
-    data_perfume_2 = PerfumeCreate(brand="Creed", name="Aventus")
-    mdl_perfume_1 = await create_perfume(session_factory, data_perfume_1)
-    mdl_perfume_2 = await create_perfume(session_factory, data_perfume_2)
+    existing_perfume = await create_perfume(
+        session_factory, PerfumeCreate(brand="Tom Ford", name="Oud Wood")
+    )
+    target_perfume = await create_perfume(
+        session_factory, PerfumeCreate(brand="Creed", name="Aventus")
+    )
 
     duplicate_data = PerfumeCreate(brand="tom  ford", name="oud   wood")
 
     with pytest.raises(DuplicatePerfumeError):
-        await update_perfume(session_factory, mdl_perfume_2.id, duplicate_data)
+        await update_perfume(session_factory, target_perfume.id, duplicate_data)
 
     async with session_factory() as session:
-        stmt = select(PerfumeRow)
-        res_query = await session.execute(stmt)
-        results = res_query.scalars().all()
+        statement = select(PerfumeRow)
+        result = await session.execute(statement)
+        results = result.scalars().all()
 
-        assert {item.id for item in results} == {mdl_perfume_1.id, mdl_perfume_2.id}
+        assert {row.id for row in results} == {
+            existing_perfume.id,
+            target_perfume.id,
+        }
         by_id = {row.id: row for row in results}
 
-        row_1 = by_id[mdl_perfume_1.id]
-        assert row_1.brand == "Tom Ford"
-        assert row_1.name == "Oud Wood"
-        assert row_1.concentration is None
-        assert row_1.brand_key == "tom ford"
-        assert row_1.name_key == "oud wood"
-        assert row_1.concentration_key is None
+        existing_row = by_id[existing_perfume.id]
+        assert existing_row.brand == "Tom Ford"
+        assert existing_row.name == "Oud Wood"
+        assert existing_row.concentration is None
+        assert existing_row.brand_key == "tom ford"
+        assert existing_row.name_key == "oud wood"
+        assert existing_row.concentration_key is None
 
-        row_2 = by_id[mdl_perfume_2.id]
-        assert row_2.brand == "Creed"
-        assert row_2.name == "Aventus"
-        assert row_2.concentration is None
-        assert row_2.brand_key == "creed"
-        assert row_2.name_key == "aventus"
-        assert row_2.concentration_key is None
+        target_row = by_id[target_perfume.id]
+        assert target_row.brand == "Creed"
+        assert target_row.name == "Aventus"
+        assert target_row.concentration is None
+        assert target_row.brand_key == "creed"
+        assert target_row.name_key == "aventus"
+        assert target_row.concentration_key is None
 
 
 @pytest.mark.anyio
-async def test_empty_perfume_update(
+async def test_update_missing_perfume_raises_not_found(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
+    data = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
 
     with pytest.raises(PerfumeNotFoundError):
-        await update_perfume(session_factory, perfume_id=999, data=data_perfume)
+        await update_perfume(session_factory, perfume_id=999, data=data)
 
     async with session_factory() as session:
-        stmt = select(PerfumeRow)
-        res_query = await session.execute(stmt)
-        result = res_query.scalar_one_or_none()
-
-        assert result is None
+        statement = select(PerfumeRow)
+        result = await session.execute(statement)
+        assert result.scalar_one_or_none() is None
 
 
 @pytest.mark.anyio
-async def test_empty_list_perfumes(
+async def test_list_perfumes_empty(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    result = await list_perfumes(session_factory)
-
-    assert result == []
+    assert await list_perfumes(session_factory) == []
 
 
 @pytest.mark.anyio
-async def test_correct_list_perfumes(
+async def test_list_perfumes(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume_1 = PerfumeCreate(
-        brand="Tom Ford", name="Oud Wood", concentration="EDT"
+    first_perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT"),
     )
-    data_perfume_2 = PerfumeCreate(brand="Creed", name="Aventus")
-    mdl_perfume_1 = await create_perfume(session_factory, data_perfume_1)
-    mdl_perfume_2 = await create_perfume(session_factory, data_perfume_2)
+    second_perfume = await create_perfume(
+        session_factory, PerfumeCreate(brand="Creed", name="Aventus")
+    )
 
-    results = await list_perfumes(session_factory)
+    perfumes = await list_perfumes(session_factory)
 
-    assert len(results) == 2
-
-    items_by_id = {item.id: item for item in results}
-    assert items_by_id == {
-        mdl_perfume_1.id: mdl_perfume_1,
-        mdl_perfume_2.id: mdl_perfume_2,
-    }
-
-    assert [item.id for item in results] == [
-        mdl_perfume_1.id,
-        mdl_perfume_2.id,
-    ]
+    assert perfumes == [first_perfume, second_perfume]
 
 
 @pytest.mark.anyio
 async def test_list_perfumes_search(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume_1 = PerfumeCreate(
-        brand="Tom Ford", name="Oud Wood", concentration="EDT"
+    first_perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT"),
     )
-    data_perfume_2 = PerfumeCreate(brand="Creed", name="Aventus")
-    data_perfume_3 = PerfumeCreate(brand="Chanel", name="Bleu de Chanel")
-
-    mdl_perfume_1 = await create_perfume(session_factory, data_perfume_1)
-    mdl_perfume_2 = await create_perfume(session_factory, data_perfume_2)
-    await create_perfume(session_factory, data_perfume_3)
+    second_perfume = await create_perfume(
+        session_factory, PerfumeCreate(brand="Creed", name="Aventus")
+    )
+    await create_perfume(
+        session_factory, PerfumeCreate(brand="Chanel", name="Bleu de Chanel")
+    )
 
     find_perfume_1 = await list_perfumes(session_factory, q="ford")
     find_perfume_2 = await list_perfumes(session_factory, q="AVEN  ")
 
-    assert find_perfume_1 == [mdl_perfume_1]
-    assert find_perfume_2 == [mdl_perfume_2]
+    assert find_perfume_1 == [first_perfume]
+    assert find_perfume_2 == [second_perfume]
 
 
 @pytest.mark.anyio
 async def test_list_perfumes_search_no_matches(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT")
-    await create_perfume(session_factory, data_perfume)
+    await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT"),
+    )
 
-    result = await list_perfumes(session_factory, q="Dior")
-
-    assert result == []
+    assert await list_perfumes(session_factory, q="Dior") == []
 
 
 @pytest.mark.anyio
-async def test_correct_archive_status(
+async def test_archive_and_restore_collection_item(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
-    )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
-    )
-
-    data_wearing = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
-        rating=10,
-        comment="Test comment",
-    )
-    mdl_wearing = await create_wearing(
+    perfume = await create_perfume(
         session_factory,
-        collection_item_id=mdl_collection_item.id,
-        data=data_wearing,
+        PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT"),
+    )
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
+    )
+    wearing = await create_wearing(
+        session_factory,
+        collection_item_id=item.id,
+        data=WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+            rating=10,
+            comment="Test comment",
+        ),
     )
 
     archived_item = await set_collection_item_status(
-        session_factory, mdl_collection_item.id, "archived"
+        session_factory, item.id, "archived"
     )
     assert archived_item.status == "archived"
-    assert archived_item.id == mdl_collection_item.id
-    assert archived_item.perfume_id == mdl_perfume.id
+    assert archived_item.id == item.id
+    assert archived_item.perfume_id == perfume.id
 
-    details_archived = await get_perfume_details(
-        session_factory, perfume_id=mdl_perfume.id
-    )
+    details_archived = await get_perfume_details(session_factory, perfume_id=perfume.id)
     assert len(details_archived.collection_items) == 1
     item_archived = details_archived.collection_items[0]
-    assert item_archived.id == mdl_collection_item.id
+    assert item_archived.id == item.id
     assert item_archived.status == "archived"
-    assert item_archived.wearings == [mdl_wearing]
+    assert item_archived.wearings == [wearing]
 
     archived_item_repeat = await set_collection_item_status(
-        session_factory, mdl_collection_item.id, "archived"
+        session_factory, item.id, "archived"
     )
     assert archived_item_repeat == archived_item
 
-    active_item = await set_collection_item_status(
-        session_factory, mdl_collection_item.id, "active"
-    )
-    assert active_item == mdl_collection_item
+    active_item = await set_collection_item_status(session_factory, item.id, "active")
+    assert active_item == item
 
-    details_active = await get_perfume_details(
-        session_factory, perfume_id=mdl_perfume.id
-    )
+    details_active = await get_perfume_details(session_factory, perfume_id=perfume.id)
     assert len(details_active.collection_items) == 1
     item_active = details_active.collection_items[0]
+    assert item_active.id == item.id
     assert item_active.status == "active"
-    assert item_active.wearings == [mdl_wearing]
+    assert item_active.wearings == [wearing]
 
 
 @pytest.mark.anyio
 async def test_set_collection_item_status_not_found(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-
     with pytest.raises(CollectionItemNotFoundError):
         await set_collection_item_status(
             session_factory, collection_item_id=999, status="archived"
@@ -836,24 +792,23 @@ async def test_set_collection_item_status_not_found(
 
 
 @pytest.mark.anyio
-async def test_archived_create_wearing(
+async def test_create_wearing_for_archived_item_raises_conflict(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Tom Ford", name="Oud Wood", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
+    await set_collection_item_status(session_factory, item.id, "archived")
 
-    await set_collection_item_status(
-        session_factory, mdl_collection_item.id, "archived"
-    )
-
-    data_wearing = WearingCreate(
+    wearing_data = WearingCreate(
         worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
         rating=10,
         comment="Test comment",
@@ -862,143 +817,141 @@ async def test_archived_create_wearing(
     with pytest.raises(CollectionItemArchivedError):
         await create_wearing(
             session_factory,
-            collection_item_id=mdl_collection_item.id,
-            data=data_wearing,
+            collection_item_id=item.id,
+            data=wearing_data,
         )
 
-    details_archived = await get_perfume_details(
-        session_factory, perfume_id=mdl_perfume.id
-    )
+    details_archived = await get_perfume_details(session_factory, perfume_id=perfume.id)
     assert len(details_archived.collection_items) == 1
     item_archived = details_archived.collection_items[0]
-    assert item_archived.id == mdl_collection_item.id
+    assert item_archived.id == item.id
     assert item_archived.status == "archived"
     assert item_archived.wearings == []
 
-    await set_collection_item_status(session_factory, mdl_collection_item.id, "active")
+    await set_collection_item_status(session_factory, item.id, "active")
 
-    mdl_wearing = await create_wearing(
+    wearing = await create_wearing(
         session_factory,
-        collection_item_id=mdl_collection_item.id,
-        data=data_wearing,
+        collection_item_id=item.id,
+        data=wearing_data,
     )
 
-    details_active = await get_perfume_details(
-        session_factory, perfume_id=mdl_perfume.id
-    )
+    details_active = await get_perfume_details(session_factory, perfume_id=perfume.id)
     assert len(details_active.collection_items) == 1
     item_active = details_active.collection_items[0]
-    assert item_active.id == mdl_collection_item.id
+    assert item_active.id == item.id
     assert item_active.status == "active"
-    assert item_active.wearings == [mdl_wearing]
+    assert item_active.wearings == [wearing]
 
 
 @pytest.mark.anyio
-async def test_empty_list_collection_items(
+async def test_list_collection_items_empty(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    result = await list_collection_items(session_factory, "active")
-
-    assert result == []
+    assert await list_collection_items(session_factory, "active") == []
 
 
 @pytest.mark.anyio
-async def test_correct_list_collection_items(
+async def test_list_collection_items_filters_by_status(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item_1 = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    data_collection_item_2 = CollectionItemCreate(
-        kind="bottle", initial_volume_ml=200, acquired_on=date(2026, 9, 20)
+    first_item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
-
-    mdl_collection_item_1 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item_1
-    )
-    mdl_collection_item_2 = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item_2
+    second_item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="bottle", initial_volume_ml=200, acquired_on=date(2026, 9, 20)
+        ),
     )
 
     archived_item = await set_collection_item_status(
-        session_factory, mdl_collection_item_2.id, "archived"
+        session_factory, second_item.id, "archived"
     )
 
-    active_items_list = await list_collection_items(session_factory, "active")
-    assert active_items_list == [mdl_collection_item_1]
-
-    archived_items_list = await list_collection_items(session_factory, "archived")
-    assert archived_items_list == [archived_item]
+    assert await list_collection_items(session_factory, "active") == [first_item]
+    assert await list_collection_items(session_factory, "archived") == [archived_item]
 
 
 @pytest.mark.anyio
-async def test_correct_list_wearings(
+async def test_list_wearings_returns_item_history_newest_first(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
-    )
-
-    other_item_data = CollectionItemCreate(
-        kind="bottle", initial_volume_ml=150, acquired_on=date(2026, 9, 15)
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
     other_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=other_item_data
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="bottle", initial_volume_ml=150, acquired_on=date(2026, 9, 15)
+        ),
     )
 
-    data_wearing_1 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-28T15:00:00+03:00"),
-        rating=9,
+    older_wearing = await create_wearing(
+        session_factory,
+        item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-28T15:00:00+03:00"),
+            rating=9,
+        ),
     )
-    mdl_wearing_1 = await create_wearing(
-        session_factory, mdl_collection_item.id, data_wearing_1
+    newer_wearing = await create_wearing(
+        session_factory,
+        item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-11-05T15:00:00+03:00"),
+            rating=9,
+        ),
+    )
+    await create_wearing(
+        session_factory,
+        other_item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-15T15:00:00+03:00"),
+            rating=9,
+        ),
     )
 
-    data_wearing_2 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-11-05T15:00:00+03:00"),
-        rating=9,
-    )
-    mdl_wearing_2 = await create_wearing(
-        session_factory, mdl_collection_item.id, data_wearing_2
-    )
+    wearings = await list_wearings(session_factory, item.id)
 
-    data_wearing_3 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-15T15:00:00+03:00"),
-        rating=9,
-    )
-    await create_wearing(session_factory, other_item.id, data_wearing_3)
-
-    wearings = await list_wearings(session_factory, mdl_collection_item.id)
-
-    assert wearings == [mdl_wearing_2, mdl_wearing_1]
+    assert wearings == [newer_wearing, older_wearing]
 
 
 @pytest.mark.anyio
-async def test_empty_list_wearings(
+async def test_list_wearings_empty(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
 
-    wearings = await list_wearings(session_factory, mdl_collection_item.id)
-
-    assert wearings == []
+    assert await list_wearings(session_factory, item.id) == []
 
 
 @pytest.mark.anyio
@@ -1010,95 +963,103 @@ async def test_list_wearings_not_found(
 
 
 @pytest.mark.anyio
-async def test_list_wearings_dates(
+async def test_list_wearings_filter_by_date_range(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
-    )
-
-    data_wearing_1 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-28T10:00:00+03:00"),
-        rating=9,
-    )
-    mdl_wearing_1 = await create_wearing(
-        session_factory, mdl_collection_item.id, data_wearing_1
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
 
-    data_wearing_2 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-11-01T12:00:00+03:00"),
-        rating=9,
+    wearing_lower = await create_wearing(
+        session_factory,
+        item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-28T10:00:00+03:00"),
+            rating=9,
+        ),
     )
-    mdl_wearing_2 = await create_wearing(
-        session_factory, mdl_collection_item.id, data_wearing_2
+    wearing_middle = await create_wearing(
+        session_factory,
+        item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-11-01T12:00:00+03:00"),
+            rating=9,
+        ),
     )
-
-    data_wearing_3 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-11-05T10:00:00+03:00"),
-        rating=9,
+    await create_wearing(
+        session_factory,
+        item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-11-05T10:00:00+03:00"),
+            rating=9,
+        ),
     )
-    await create_wearing(session_factory, mdl_collection_item.id, data_wearing_3)
 
     t_zone = timezone(timedelta(hours=3))
-    t_from = datetime(2026, 10, 28, 10, 0, tzinfo=t_zone)
-    t_before = datetime(2026, 11, 5, 10, 0, tzinfo=t_zone)
+    worn_from = datetime(2026, 10, 28, 10, 0, tzinfo=t_zone)
+    worn_before = datetime(2026, 11, 5, 10, 0, tzinfo=t_zone)
 
     wearings = await list_wearings(
         session_factory,
-        mdl_collection_item.id,
-        worn_from=t_from,
-        worn_before=t_before,
+        item.id,
+        worn_from=worn_from,
+        worn_before=worn_before,
     )
 
-    assert wearings == [mdl_wearing_2, mdl_wearing_1]
+    assert wearings == [wearing_middle, wearing_lower]
 
 
 @pytest.mark.anyio
-async def test_correct_delete_active_collection_item(
+async def test_delete_active_collection_item(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
 
-    await delete_collection_item(session_factory, mdl_collection_item.id)
+    await delete_collection_item(session_factory, item.id)
 
     async with session_factory() as session:
         res = await session.scalars(select(CollectionItemRow))
         assert res.all() == []
 
-        perfume = await session.get(PerfumeRow, mdl_perfume.id)
-        assert perfume is not None
+        perfume_row = await session.get(PerfumeRow, perfume.id)
+        assert perfume_row is not None
 
 
 @pytest.mark.anyio
-async def test_correct_delete_archived_collection_item(
+async def test_delete_archived_collection_item(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
-
     archived_item = await set_collection_item_status(
-        session_factory, mdl_collection_item.id, "archived"
+        session_factory, item.id, "archived"
     )
 
     await delete_collection_item(session_factory, archived_item.id)
@@ -1107,12 +1068,12 @@ async def test_correct_delete_archived_collection_item(
         res = await session.scalars(select(CollectionItemRow))
         assert res.all() == []
 
-        perfume = await session.get(PerfumeRow, mdl_perfume.id)
-        assert perfume is not None
+        perfume_row = await session.get(PerfumeRow, perfume.id)
+        assert perfume_row is not None
 
 
 @pytest.mark.anyio
-async def test_delete_not_found_collection_item(
+async def test_delete_collection_item_not_found(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     with pytest.raises(CollectionItemNotFoundError):
@@ -1120,55 +1081,59 @@ async def test_delete_not_found_collection_item(
 
 
 @pytest.mark.anyio
-async def test_failed_delete_collection_item_with_wearings(
+async def test_delete_collection_item_with_wearings_raises_conflict(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
-
-    data_wearing = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T15:00:00+03:00"),
-        rating=9,
-    )
-    mdl_wearing = await create_wearing(
-        session_factory, mdl_collection_item.id, data_wearing
+    wearing = await create_wearing(
+        session_factory,
+        item.id,
+        WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T15:00:00+03:00"),
+            rating=9,
+        ),
     )
 
     with pytest.raises(CollectionItemHasWearingsError):
-        await delete_collection_item(session_factory, mdl_collection_item.id)
+        await delete_collection_item(session_factory, item.id)
 
-    details = await get_perfume_details(session_factory, mdl_perfume.id)
+    details = await get_perfume_details(session_factory, perfume.id)
 
-    assert details.collection_items[0].id == mdl_collection_item.id
-    assert details.collection_items[0].wearings == [mdl_wearing]
+    assert details.collection_items[0].id == item.id
+    assert details.collection_items[0].wearings == [wearing]
 
 
 @pytest.mark.anyio
-async def test_correct_delete_perfume(
+async def test_delete_perfume(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
+    )
 
-    await delete_perfume(session_factory, mdl_perfume.id)
+    await delete_perfume(session_factory, perfume.id)
 
     async with session_factory() as session:
         res = await session.scalars(select(PerfumeRow))
         assert res.all() == []
 
-        perfume = await session.get(PerfumeRow, mdl_perfume.id)
-        assert perfume is None
+        perfume_row = await session.get(PerfumeRow, perfume.id)
+        assert perfume_row is None
 
 
 @pytest.mark.anyio
-async def test_unknown_id_delete_perfume(
+async def test_delete_perfume_not_found(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     with pytest.raises(PerfumeNotFoundError):
@@ -1176,53 +1141,54 @@ async def test_unknown_id_delete_perfume(
 
 
 @pytest.mark.anyio
-async def test_delete_perfume_with_active_collection_item(
+async def test_delete_perfume_with_active_collection_item_raises_conflict(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
     await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
 
-    details_before = await get_perfume_details(session_factory, mdl_perfume.id)
+    details_before = await get_perfume_details(session_factory, perfume.id)
 
     with pytest.raises(PerfumeHasCollectionItemsError):
-        await delete_perfume(session_factory, mdl_perfume.id)
+        await delete_perfume(session_factory, perfume.id)
 
-    details_after = await get_perfume_details(session_factory, mdl_perfume.id)
+    details_after = await get_perfume_details(session_factory, perfume.id)
 
     assert details_before == details_after
 
 
 @pytest.mark.anyio
-async def test_delete_perfume_with_archived_collection_item(
+async def test_delete_perfume_with_archived_collection_item_raises_conflict(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
+    await set_collection_item_status(session_factory, item.id, "archived")
 
-    await set_collection_item_status(
-        session_factory, mdl_collection_item.id, "archived"
-    )
-
-    details_before = await get_perfume_details(session_factory, mdl_perfume.id)
+    details_before = await get_perfume_details(session_factory, perfume.id)
 
     with pytest.raises(PerfumeHasCollectionItemsError):
-        await delete_perfume(session_factory, mdl_perfume.id)
+        await delete_perfume(session_factory, perfume.id)
 
-    details_after = await get_perfume_details(session_factory, mdl_perfume.id)
+    details_after = await get_perfume_details(session_factory, perfume.id)
 
     assert details_before == details_after
 
@@ -1231,78 +1197,81 @@ async def test_delete_perfume_with_archived_collection_item(
 async def test_delete_wearing(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
-    )
-
-    data_wearing_1 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
-        rating=6,
-        comment="Test comment",
-    )
-    mdl_wearing_1 = await create_wearing(
-        session_factory, collection_item_id=mdl_collection_item.id, data=data_wearing_1
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
 
-    data_wearing_2 = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-09-02T09:30:00+03:00"),
-        rating=10,
-        comment="Test comment",
+    wearing_to_delete = await create_wearing(
+        session_factory,
+        collection_item_id=item.id,
+        data=WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+            rating=6,
+            comment="Test comment",
+        ),
     )
-    mdl_wearing_2 = await create_wearing(
-        session_factory, collection_item_id=mdl_collection_item.id, data=data_wearing_2
+    remaining_wearing = await create_wearing(
+        session_factory,
+        collection_item_id=item.id,
+        data=WearingCreate(
+            worn_at=datetime.fromisoformat("2026-09-02T09:30:00+03:00"),
+            rating=10,
+            comment="Test comment",
+        ),
     )
 
-    details_before = await get_perfume_details(session_factory, mdl_perfume.id)
+    details_before = await get_perfume_details(session_factory, perfume.id)
 
-    await delete_wearing(session_factory, mdl_wearing_1.id)
+    await delete_wearing(session_factory, wearing_to_delete.id)
 
-    details_after = await get_perfume_details(session_factory, mdl_perfume.id)
+    details_after = await get_perfume_details(session_factory, perfume.id)
 
     assert details_before.average_rating != details_after.average_rating
     assert details_after.average_rating == 10
-    assert details_after.id == mdl_perfume.id
+    assert details_after.id == perfume.id
     assert len(details_after.collection_items) == 1
-    assert details_after.collection_items[0].id == mdl_collection_item.id
-    assert details_after.collection_items[0].wearings == [mdl_wearing_2]
+    assert details_after.collection_items[0].id == item.id
+    assert details_after.collection_items[0].wearings == [remaining_wearing]
 
 
 @pytest.mark.anyio
 async def test_delete_wearing_with_archived_item(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data_perfume = PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT")
-    mdl_perfume = await create_perfume(session_factory, data_perfume)
-
-    data_collection_item = CollectionItemCreate(
-        kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+    perfume = await create_perfume(
+        session_factory,
+        PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
     )
-    mdl_collection_item = await create_collection_item(
-        session_factory, perfume_id=mdl_perfume.id, data=data_collection_item
+    item = await create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
     )
-
-    data_wearing = WearingCreate(
-        worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
-        rating=6,
-        comment="Test comment",
-    )
-    mdl_wearing = await create_wearing(
-        session_factory, collection_item_id=mdl_collection_item.id, data=data_wearing
-    )
-
-    await set_collection_item_status(
-        session_factory, mdl_collection_item.id, "archived"
+    wearing = await create_wearing(
+        session_factory,
+        collection_item_id=item.id,
+        data=WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+            rating=6,
+            comment="Test comment",
+        ),
     )
 
-    await delete_wearing(session_factory, mdl_wearing.id)
+    await set_collection_item_status(session_factory, item.id, "archived")
 
-    details = await get_perfume_details(session_factory, mdl_perfume.id)
+    await delete_wearing(session_factory, wearing.id)
+
+    details = await get_perfume_details(session_factory, perfume.id)
 
     assert details.average_rating is None
     assert details.collection_items[0].wearings == []
@@ -1310,7 +1279,7 @@ async def test_delete_wearing_with_archived_item(
 
 
 @pytest.mark.anyio
-async def test_delete_wearing_unknown_id(
+async def test_delete_wearing_not_found(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     with pytest.raises(WearingNotFoundError):
