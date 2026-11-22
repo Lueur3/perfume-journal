@@ -153,6 +153,27 @@ async def get_perfume_details(
         if orm_perfume is None:
             raise PerfumeNotFoundError("Perfume not found.")
 
+        source = mdl.PerfumeSource.model_validate(
+            {
+                "sillage": orm_perfume.source_sillage,
+                "longevity": orm_perfume.source_longevity,
+                "seasons": orm_perfume.source_seasons,
+                "times_of_day": orm_perfume.source_times_of_day,
+                "url": orm_perfume.source_url,
+            }
+        )
+
+        personal = mdl.PerfumePersonal.model_validate(
+            {
+                "sillage": orm_perfume.personal_sillage,
+                "longevity": orm_perfume.personal_longevity,
+                "longevity_hours": orm_perfume.personal_longevity_hours,
+                "seasons": orm_perfume.personal_seasons,
+                "times_of_day": orm_perfume.personal_times_of_day,
+                "comment": orm_perfume.personal_comment,
+            }
+        )
+
         statement_collection_item = select(orm.CollectionItem).where(
             orm.CollectionItem.perfume_id == perfume_id
         )
@@ -197,6 +218,8 @@ async def get_perfume_details(
         **mdl_perfume.model_dump(),
         collection_items=collection_items_details_list,
         average_rating=average_rating,
+        source=source,
+        personal=personal,
     )
 
 
@@ -372,3 +395,62 @@ async def delete_wearing(
 
         await session.delete(wearing)
         await session.flush()
+
+
+async def update_perfume_source(
+    session_factory: async_sessionmaker[AsyncSession],
+    perfume_id: int,
+    data: mdl.PerfumeSourceUpdate,
+) -> mdl.PerfumeSource:
+    async with session_factory.begin() as session:
+        perfume = await session.get(orm.Perfume, perfume_id)
+
+        if perfume is None:
+            raise PerfumeNotFoundError("Perfume not found.")
+
+        new_data = data.model_dump(mode="json", exclude_unset=True)
+
+        for field, value in new_data.items():
+            setattr(perfume, f"source_{field}", value)
+
+        await session.flush()
+
+        return mdl.PerfumeSource.model_validate(
+            {
+                "sillage": perfume.source_sillage,
+                "longevity": perfume.source_longevity,
+                "seasons": perfume.source_seasons,
+                "times_of_day": perfume.source_times_of_day,
+                "url": perfume.source_url,
+            }
+        )
+
+
+async def update_perfume_personal(
+    session_factory: async_sessionmaker[AsyncSession],
+    perfume_id: int,
+    data: mdl.PerfumePersonalUpdate,
+) -> mdl.PerfumePersonal:
+    async with session_factory.begin() as session:
+        perfume = await session.get(orm.Perfume, perfume_id)
+
+        if perfume is None:
+            raise PerfumeNotFoundError("Perfume not found.")
+
+        new_data = data.model_dump(mode="json", exclude_unset=True)
+
+        for field, value in new_data.items():
+            setattr(perfume, f"personal_{field}", value)
+
+        await session.flush()
+
+        return mdl.PerfumePersonal.model_validate(
+            {
+                "sillage": perfume.personal_sillage,
+                "longevity": perfume.personal_longevity,
+                "longevity_hours": perfume.personal_longevity_hours,
+                "seasons": perfume.personal_seasons,
+                "times_of_day": perfume.personal_times_of_day,
+                "comment": perfume.personal_comment,
+            }
+        )

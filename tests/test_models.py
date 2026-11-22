@@ -155,6 +155,21 @@ def test_nested_details_perfume_model() -> None:
             }
         ],
         "average_rating": 5.0,
+        "source": {
+            "sillage": None,
+            "longevity": "long",
+            "seasons": ["spring", "summer"],
+            "times_of_day": ["day"],
+            "url": "https://example.com/aventus",
+        },
+        "personal": {
+            "sillage": "none",
+            "longevity": "moderate",
+            "longevity_hours": 6.5,
+            "seasons": ["summer"],
+            "times_of_day": ["day", "evening"],
+            "comment": "An excellent train in warm weather.",
+        },
     }
 
     perfume = mdl.PerfumeDetails.model_validate(test_data)
@@ -175,3 +190,38 @@ def test_nested_details_perfume_model() -> None:
     assert perfume.collection_items[0].wearings[0].worn_at.tzinfo is not None
     assert perfume.collection_items[0].wearings[0].rating == 5
     assert perfume.collection_items[0].wearings[0].comment == "Test comment"
+
+    assert perfume.source.sillage is None
+    assert perfume.source.longevity == "long"
+    assert perfume.source.seasons == ["spring", "summer"]
+    assert perfume.source.times_of_day == ["day"]
+    assert perfume.source.url == "https://example.com/aventus"
+
+    assert perfume.personal.sillage == "none"
+    assert perfume.personal.longevity == "moderate"
+    assert perfume.personal.longevity_hours == 6.5
+    assert perfume.personal.seasons == ["summer"]
+    assert perfume.personal.times_of_day == ["day", "evening"]
+    assert perfume.personal.comment == "An excellent train in warm weather."
+
+
+@pytest.mark.parametrize("invalid_sillage", ["invalid", "huge", "weak"])
+def test_perfume_source_update_invalid_sillage(invalid_sillage: str) -> None:
+    with pytest.raises(ValidationError):
+        mdl.PerfumeSourceUpdate.model_validate({"sillage": invalid_sillage})
+
+
+def test_perfume_source_update_invalid_season() -> None:
+    with pytest.raises(ValidationError):
+        mdl.PerfumeSourceUpdate.model_validate({"seasons": ["monsoon"]})
+
+
+def test_perfume_source_update_invalid_url() -> None:
+    with pytest.raises(ValidationError):
+        mdl.PerfumeSourceUpdate.model_validate({"url": "not-a-url"})
+
+
+@pytest.mark.parametrize("invalid_hours", [0, -1.0, 24.1, 25])
+def test_perfume_personal_update_invalid_longevity_hours(invalid_hours: float) -> None:
+    with pytest.raises(ValidationError):
+        mdl.PerfumePersonalUpdate.model_validate({"longevity_hours": invalid_hours})

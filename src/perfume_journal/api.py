@@ -254,3 +254,43 @@ async def delete_wearing(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+
+
+@app.patch(
+    "/perfumes/{perfume_id}/source",
+    response_model=mdl.PerfumeSource,
+    status_code=status.HTTP_200_OK,
+)
+async def update_perfume_source(
+    perfume_id: int,
+    session_factory: SessionFactoryDep,
+    body: mdl.PerfumeSourceUpdate,
+) -> mdl.PerfumeSource:
+    try:
+        return await sql_store.update_perfume_source(
+            session_factory, perfume_id, data=body
+        )
+    except PerfumeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+
+
+@app.patch(
+    "/perfumes/{perfume_id}/personal",
+    response_model=mdl.PerfumePersonal,
+    status_code=status.HTTP_200_OK,
+)
+async def update_perfume_personal(
+    perfume_id: int,
+    session_factory: SessionFactoryDep,
+    body: mdl.PerfumePersonalUpdate,
+) -> mdl.PerfumePersonal:
+    try:
+        return await sql_store.update_perfume_personal(
+            session_factory, perfume_id, data=body
+        )
+    except PerfumeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

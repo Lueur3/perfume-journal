@@ -5,6 +5,7 @@ from pydantic import (
     AwareDatetime,
     BaseModel,
     Field,
+    HttpUrl,
     PositiveFloat,
     StringConstraints,
     field_validator,
@@ -18,6 +19,12 @@ CollectionItemKind = Literal["sample", "bottle"]
 CollectionItemStatus = Literal["active", "archived"]
 
 WearingRating = Annotated[int, Field(ge=1, le=10)]
+
+PerfumeSillage = Literal["none", "close_to_skin", "arms_length", "fills_room"]
+PerfumeLongevity = Literal["very_short", "short", "moderate", "long", "very_long"]
+PerfumeSeason = Literal["winter", "spring", "summer", "autumn"]
+PerfumeTimeOfDay = Literal["day", "evening"]
+PersonalLongevityHours = Annotated[float, Field(gt=0, le=24)]
 
 
 class PerfumeCreate(BaseModel):
@@ -67,10 +74,46 @@ class CollectionItemDetails(CollectionItem):
     wearings: list[Wearing]
 
 
+class CollectionItemStatusUpdate(BaseModel):
+    status: CollectionItemStatus
+
+
+class PerfumeSource(BaseModel):
+    sillage: PerfumeSillage | None
+    longevity: PerfumeLongevity | None
+    seasons: list[PerfumeSeason] | None
+    times_of_day: list[PerfumeTimeOfDay] | None
+    url: str | None
+
+
+class PerfumePersonal(BaseModel):
+    sillage: PerfumeSillage | None
+    longevity: PerfumeLongevity | None
+    longevity_hours: PersonalLongevityHours | None
+    seasons: list[PerfumeSeason] | None
+    times_of_day: list[PerfumeTimeOfDay] | None
+    comment: str | None
+
+
+class PerfumeSourceUpdate(BaseModel):
+    sillage: PerfumeSillage | None = None
+    longevity: PerfumeLongevity | None = None
+    seasons: list[PerfumeSeason] | None = None
+    times_of_day: list[PerfumeTimeOfDay] | None = None
+    url: HttpUrl | None = None
+
+
+class PerfumePersonalUpdate(BaseModel):
+    sillage: PerfumeSillage | None = None
+    longevity: PerfumeLongevity | None = None
+    longevity_hours: PersonalLongevityHours | None = None
+    seasons: list[PerfumeSeason] | None = None
+    times_of_day: list[PerfumeTimeOfDay] | None = None
+    comment: str | None = None
+
+
 class PerfumeDetails(Perfume):
     collection_items: list[CollectionItemDetails]
     average_rating: float | None
-
-
-class CollectionItemStatusUpdate(BaseModel):
-    status: CollectionItemStatus
+    source: PerfumeSource
+    personal: PerfumePersonal

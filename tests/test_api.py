@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime
+from typing import Any
 
 import pytest
 from httpx2 import ASGITransport, AsyncClient
@@ -1063,3 +1064,237 @@ async def test_delete_missing_wearing_returns_404(
     delete_response = await async_client.delete("/wearings/999")
     assert delete_response.status_code == 404
     assert delete_response.json()["detail"] == "Wearing not found."
+
+
+@pytest.mark.anyio
+async def test_update_perfume_source_partial_update_returns_200(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    source_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/source",
+        json={"sillage": "arms_length", "url": "https://example.com"},
+    )
+    assert source_response.status_code == 200
+    source_data = source_response.json()
+
+    new_source_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/source",
+        json={"sillage": "fills_room"},
+    )
+    assert new_source_response.status_code == 200
+    new_source_data = new_source_response.json()
+
+    assert new_source_data["sillage"] == "fills_room"
+    assert new_source_data["url"] == source_data["url"]
+
+
+@pytest.mark.anyio
+async def test_update_perfume_source_null_clears_field_returns_200(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    source_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/source",
+        json={"url": "https://example.com"},
+    )
+    assert source_response.status_code == 200
+
+    new_source_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/source",
+        json={"url": None},
+    )
+    assert new_source_response.status_code == 200
+    new_source_data = new_source_response.json()
+
+    assert new_source_data["url"] is None
+
+
+@pytest.mark.anyio
+async def test_update_perfume_source_missing_perfume_returns_404(
+    async_client: AsyncClient,
+) -> None:
+    source_response = await async_client.patch(
+        "/perfumes/999/source",
+        json={"url": "https://example.com"},
+    )
+
+    assert source_response.status_code == 404
+    assert source_response.json()["detail"] == "Perfume not found."
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "invalid_payload",
+    [
+        {"seasons": 123},
+        {"sillage": "invalid"},
+        {"seasons": ["monsoon"]},
+        {"url": "not-a-url"},
+    ],
+)
+async def test_update_perfume_source_invalid_body_returns_422(
+    async_client: AsyncClient, invalid_payload: dict[str, Any]
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    source_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/source",
+        json=invalid_payload,
+    )
+
+    assert source_response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_update_perfume_personal_partial_update_returns_200(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    personal_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/personal",
+        json={
+            "sillage": "arms_length",
+            "longevity_hours": 6.5,
+            "comment": "Initial impression",
+        },
+    )
+    assert personal_response.status_code == 200
+    personal_data = personal_response.json()
+
+    new_personal_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/personal",
+        json={"sillage": "fills_room"},
+    )
+    assert new_personal_response.status_code == 200
+    new_personal_data = new_personal_response.json()
+
+    assert new_personal_data["sillage"] == "fills_room"
+    assert new_personal_data["longevity_hours"] == personal_data["longevity_hours"]
+    assert new_personal_data["comment"] == personal_data["comment"]
+
+
+@pytest.mark.anyio
+async def test_update_perfume_personal_null_clears_field_returns_200(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    personal_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/personal",
+        json={"comment": "Temporary note"},
+    )
+    assert personal_response.status_code == 200
+
+    new_personal_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/personal",
+        json={"comment": None},
+    )
+    assert new_personal_response.status_code == 200
+    new_personal_data = new_personal_response.json()
+
+    assert new_personal_data["comment"] is None
+
+
+@pytest.mark.anyio
+async def test_update_perfume_personal_missing_perfume_returns_404(
+    async_client: AsyncClient,
+) -> None:
+    personal_response = await async_client.patch(
+        "/perfumes/999/personal",
+        json={"comment": "Not found test"},
+    )
+
+    assert personal_response.status_code == 404
+    assert personal_response.json()["detail"] == "Perfume not found."
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "invalid_payload",
+    [
+        {"longevity_hours": "not_a_number"},
+        {"longevity_hours": 0.0},
+        {"longevity_hours": 25.0},
+        {"sillage": "invalid"},
+        {"seasons": ["monsoon"]},
+    ],
+)
+async def test_update_perfume_personal_invalid_body_returns_422(
+    async_client: AsyncClient, invalid_payload: dict[str, Any]
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    personal_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/personal",
+        json=invalid_payload,
+    )
+
+    assert personal_response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_update_perfume_source_and_personal_isolation_in_details_returns_200(
+    async_client: AsyncClient,
+) -> None:
+    create_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert create_response.status_code == 201
+    perfume_id = create_response.json()["id"]
+
+    source_patch_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/source",
+        json={"sillage": "arms_length", "longevity": "moderate"},
+    )
+    assert source_patch_response.status_code == 200
+
+    personal_patch_response = await async_client.patch(
+        f"/perfumes/{perfume_id}/personal",
+        json={"sillage": "none", "longevity": "long", "longevity_hours": 8.0},
+    )
+    assert personal_patch_response.status_code == 200
+
+    details_response = await async_client.get(f"/perfumes/{perfume_id}")
+    assert details_response.status_code == 200
+    details = details_response.json()
+
+    assert details["source"]["sillage"] == "arms_length"
+    assert details["source"]["longevity"] == "moderate"
+    assert details["personal"]["sillage"] == "none"
+    assert details["personal"]["longevity"] == "long"
+    assert details["personal"]["longevity_hours"] == 8.0
