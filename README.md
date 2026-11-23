@@ -408,7 +408,7 @@ API, and wearing timestamps are compared as timezone-aware instants.
 Run just the database tests:
 
 ```powershell
-uv run pytest tests/test_sqlalchemy_store.py -q
+uv run pytest tests/store -q
 ```
 
 ## Development checks
