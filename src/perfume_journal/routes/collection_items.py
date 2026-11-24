@@ -35,14 +35,14 @@ async def create_collection_item(
     response_model=mdl.CollectionItem,
     status_code=status.HTTP_200_OK,
 )
-async def set_collection_item_status(
+async def update_collection_item(
     collection_item_id: int,
     session_factory: SessionFactoryDep,
-    body: mdl.CollectionItemStatusUpdate,
+    body: mdl.CollectionItemUpdate,
 ) -> mdl.CollectionItem:
     try:
-        return await sql_store.set_collection_item_status(
-            session_factory, collection_item_id, body.status
+        return await sql_store.update_collection_item(
+            session_factory, collection_item_id, data=body
         )
     except CollectionItemNotFoundError as exc:
         raise HTTPException(

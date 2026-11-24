@@ -147,7 +147,9 @@ async def test_create_wearing_for_archived_item_raises_conflict(
             kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
         ),
     )
-    await item_store.set_collection_item_status(session_factory, item.id, "archived")
+    await item_store.update_collection_item(
+        session_factory, item.id, mdl.CollectionItemUpdate(status="archived")
+    )
 
     wearing_data = mdl.WearingCreate(
         worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
@@ -171,7 +173,9 @@ async def test_create_wearing_for_archived_item_raises_conflict(
     assert item_archived.status == "archived"
     assert item_archived.wearings == []
 
-    await item_store.set_collection_item_status(session_factory, item.id, "active")
+    await item_store.update_collection_item(
+        session_factory, item.id, mdl.CollectionItemUpdate(status="active")
+    )
 
     wearing = await wearing_store.create_wearing(
         session_factory,
@@ -400,7 +404,9 @@ async def test_delete_wearing_with_archived_item(
         ),
     )
 
-    await item_store.set_collection_item_status(session_factory, item.id, "archived")
+    await item_store.update_collection_item(
+        session_factory, item.id, mdl.CollectionItemUpdate(status="archived")
+    )
 
     await wearing_store.delete_wearing(session_factory, wearing.id)
 

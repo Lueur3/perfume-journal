@@ -577,7 +577,9 @@ async def test_delete_perfume_with_archived_collection_item_raises_conflict(
             kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
         ),
     )
-    await item_store.set_collection_item_status(session_factory, item.id, "archived")
+    await item_store.update_collection_item(
+        session_factory, item.id, mdl.CollectionItemUpdate(status="archived")
+    )
 
     details_before = await perfume_store.get_perfume_details(
         session_factory, perfume.id
@@ -619,13 +621,13 @@ async def test_update_perfume_source_partial_update_preserves_other_fields(
     async with session_factory() as session:
         stmt = select(PerfumeRow)
         res_query = await session.execute(stmt)
-        updt_perfume = res_query.scalar_one()
+        updated_perfume = res_query.scalar_one()
 
-        assert updt_perfume.brand == "Creed"
-        assert updt_perfume.name == "Aventus"
-        assert updt_perfume.concentration == "EDT"
-        assert updt_perfume.source_sillage == "fills_room"
-        assert updt_perfume.source_url == "https://example.com"
+        assert updated_perfume.brand == "Creed"
+        assert updated_perfume.name == "Aventus"
+        assert updated_perfume.concentration == "EDT"
+        assert updated_perfume.source_sillage == "fills_room"
+        assert updated_perfume.source_url == "https://example.com"
 
 
 @pytest.mark.anyio
@@ -653,13 +655,13 @@ async def test_update_perfume_source_none_clears_field(
     async with session_factory() as session:
         stmt = select(PerfumeRow)
         res_query = await session.execute(stmt)
-        updt_perfume = res_query.scalar_one()
+        updated_perfume = res_query.scalar_one()
 
-        assert updt_perfume.brand == "Creed"
-        assert updt_perfume.name == "Aventus"
-        assert updt_perfume.concentration == "EDT"
-        assert updt_perfume.source_sillage == "arms_length"
-        assert updt_perfume.source_url is None
+        assert updated_perfume.brand == "Creed"
+        assert updated_perfume.name == "Aventus"
+        assert updated_perfume.concentration == "EDT"
+        assert updated_perfume.source_sillage == "arms_length"
+        assert updated_perfume.source_url is None
 
 
 @pytest.mark.anyio
@@ -688,13 +690,13 @@ async def test_update_perfume_source_empty_payload_preserves_all_fields(
     async with session_factory() as session:
         stmt = select(PerfumeRow)
         res_query = await session.execute(stmt)
-        updt_perfume = res_query.scalar_one()
+        updated_perfume = res_query.scalar_one()
 
-        assert updt_perfume.brand == "Creed"
-        assert updt_perfume.name == "Aventus"
-        assert updt_perfume.concentration == "EDT"
-        assert updt_perfume.source_sillage == "arms_length"
-        assert updt_perfume.source_url == "https://example.com"
+        assert updated_perfume.brand == "Creed"
+        assert updated_perfume.name == "Aventus"
+        assert updated_perfume.concentration == "EDT"
+        assert updated_perfume.source_sillage == "arms_length"
+        assert updated_perfume.source_url == "https://example.com"
 
 
 @pytest.mark.anyio
@@ -737,14 +739,14 @@ async def test_update_perfume_personal_partial_update_preserves_other_fields(
     async with session_factory() as session:
         stmt = select(PerfumeRow).where(PerfumeRow.id == perfume.id)
         res_query = await session.execute(stmt)
-        updt_perfume = res_query.scalar_one()
+        updated_perfume = res_query.scalar_one()
 
-        assert updt_perfume.brand == "Creed"
-        assert updt_perfume.name == "Aventus"
-        assert updt_perfume.concentration == "EDT"
-        assert updt_perfume.personal_sillage == "fills_room"
-        assert updt_perfume.personal_longevity_hours == 6.5
-        assert updt_perfume.personal_comment == "Great scent"
+        assert updated_perfume.brand == "Creed"
+        assert updated_perfume.name == "Aventus"
+        assert updated_perfume.concentration == "EDT"
+        assert updated_perfume.personal_sillage == "fills_room"
+        assert updated_perfume.personal_longevity_hours == 6.5
+        assert updated_perfume.personal_comment == "Great scent"
 
 
 @pytest.mark.anyio
@@ -772,13 +774,13 @@ async def test_update_perfume_personal_none_clears_field(
     async with session_factory() as session:
         stmt = select(PerfumeRow).where(PerfumeRow.id == perfume.id)
         res_query = await session.execute(stmt)
-        updt_perfume = res_query.scalar_one()
+        updated_perfume = res_query.scalar_one()
 
-        assert updt_perfume.brand == "Creed"
-        assert updt_perfume.name == "Aventus"
-        assert updt_perfume.concentration == "EDT"
-        assert updt_perfume.personal_sillage == "arms_length"
-        assert updt_perfume.personal_comment is None
+        assert updated_perfume.brand == "Creed"
+        assert updated_perfume.name == "Aventus"
+        assert updated_perfume.concentration == "EDT"
+        assert updated_perfume.personal_sillage == "arms_length"
+        assert updated_perfume.personal_comment is None
 
 
 @pytest.mark.anyio
@@ -807,13 +809,13 @@ async def test_update_perfume_personal_empty_payload_preserves_all_fields(
     async with session_factory() as session:
         stmt = select(PerfumeRow).where(PerfumeRow.id == perfume.id)
         res_query = await session.execute(stmt)
-        updt_perfume = res_query.scalar_one()
+        updated_perfume = res_query.scalar_one()
 
-        assert updt_perfume.brand == "Creed"
-        assert updt_perfume.name == "Aventus"
-        assert updt_perfume.concentration == "EDT"
-        assert updt_perfume.personal_sillage == "arms_length"
-        assert updt_perfume.personal_longevity_hours == 6.5
+        assert updated_perfume.brand == "Creed"
+        assert updated_perfume.name == "Aventus"
+        assert updated_perfume.concentration == "EDT"
+        assert updated_perfume.personal_sillage == "arms_length"
+        assert updated_perfume.personal_longevity_hours == 6.5
 
 
 @pytest.mark.anyio

@@ -56,6 +56,16 @@ def test_rejects_zero_or_negative_volume() -> None:
         mdl.CollectionItemCreate(kind="bottle", initial_volume_ml=-2)
 
 
+def test_collection_item_update_rejects_null_kind() -> None:
+    with pytest.raises(ValidationError, match="kind can't be None."):
+        mdl.CollectionItemUpdate(kind=None)
+
+
+def test_collection_item_update_rejects_null_status() -> None:
+    with pytest.raises(ValidationError, match="status can't be None."):
+        mdl.CollectionItemUpdate(status=None)
+
+
 def test_correct_collection_item() -> None:
     test_collection_item = mdl.CollectionItem(
         kind="sample",

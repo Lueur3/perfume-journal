@@ -69,10 +69,10 @@ async def list_collection_items(
         ]
 
 
-async def set_collection_item_status(
+async def update_collection_item(
     session_factory: async_sessionmaker[AsyncSession],
     collection_item_id: int,
-    status: mdl.CollectionItemStatus,
+    data: mdl.CollectionItemUpdate,
 ) -> mdl.CollectionItem:
     async with session_factory.begin() as session:
         item = await session.get(orm.CollectionItem, collection_item_id)
@@ -80,7 +80,10 @@ async def set_collection_item_status(
         if item is None:
             raise CollectionItemNotFoundError("Collection item not found.")
 
-        item.status = status
+        new_data = data.model_dump(exclude_unset=True)
+        for field, value in new_data.items():
+            setattr(item, field, value)
+
         await session.flush()
 
         mdl_item = mdl.CollectionItem.model_validate(item, from_attributes=True)
