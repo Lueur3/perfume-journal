@@ -169,7 +169,7 @@ async def test_archive_and_restore_collection_item(async_client: AsyncClient) ->
 
 
 @pytest.mark.anyio
-async def test_set_collection_item_status_missing_item_returns_404(
+async def test_update_collection_item_missing_item_returns_404(
     async_client: AsyncClient,
 ) -> None:
     archive_item_response = await async_client.patch(
@@ -181,7 +181,7 @@ async def test_set_collection_item_status_missing_item_returns_404(
 
 
 @pytest.mark.anyio
-async def test_set_collection_item_status_invalid_returns_422(
+async def test_update_collection_item_invalid_status_returns_422(
     async_client: AsyncClient,
 ) -> None:
     perfume_response = await async_client.post(
@@ -360,3 +360,135 @@ async def test_delete_collection_item_with_wearings_returns_409(
     second_details = second_details_response.json()
 
     assert first_details == second_details
+
+
+@pytest.mark.anyio
+async def test_get_collection_item_by_id(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    assert item_response.status_code == 201
+    collection_item_id = item_response.json()["id"]
+
+    target_item_response = await async_client.get(
+        f"/collection-items/{collection_item_id}"
+    )
+
+    assert target_item_response.status_code == 200
+    assert target_item_response.json() == item_response.json()
+
+
+@pytest.mark.anyio
+async def test_get_collection_item_missing_returns_404(
+    async_client: AsyncClient,
+) -> None:
+    item_response = await async_client.get("/collection-items/999")
+
+    assert item_response.status_code == 404
+    assert item_response.json()["detail"] == "Collection item not found."
+
+
+@pytest.mark.anyio
+async def test_updates_collection_item(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    assert item_response.status_code == 201
+    collection_item_id = item_response.json()["id"]
+
+    updated_item_response = await async_client.patch(
+        f"/collection-items/{collection_item_id}",
+        json={"kind": "bottle", "initial_volume_ml": None, "status": "archived"},
+    )
+    assert updated_item_response.status_code == 200
+    updated_item = updated_item_response.json()
+
+    assert updated_item["kind"] == "bottle"
+    assert updated_item["initial_volume_ml"] is None
+    assert updated_item["acquired_on"] == "2026-05-09"
+    assert updated_item["status"] == "archived"
+    assert updated_item["id"] == collection_item_id
+    assert updated_item["perfume_id"] == perfume_id
+
+    detail_response = await async_client.get(f"/collection-items/{collection_item_id}")
+    assert detail_response.json() == updated_item
+
+
+@pytest.mark.anyio
+async def test_update_collection_item_null_status_returns_422(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    assert item_response.status_code == 201
+    item = item_response.json()
+    collection_item_id = item_response.json()["id"]
+
+    updated_item_response = await async_client.patch(
+        f"/collection-items/{collection_item_id}",
+        json={"status": None},
+    )
+
+    assert updated_item_response.status_code == 422
+
+    detail_response = await async_client.get(f"/collection-items/{collection_item_id}")
+    assert detail_response.json() == item
+
+
+@pytest.mark.anyio
+async def test_update_collection_item_null_kind_returns_422(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    assert item_response.status_code == 201
+    item = item_response.json()
+    collection_item_id = item_response.json()["id"]
+
+    updated_item_response = await async_client.patch(
+        f"/collection-items/{collection_item_id}",
+        json={"kind": None},
+    )
+
+    assert updated_item_response.status_code == 422
+
+    detail_response = await async_client.get(f"/collection-items/{collection_item_id}")
+    assert detail_response.json() == item

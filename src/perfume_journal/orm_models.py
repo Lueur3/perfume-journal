@@ -43,7 +43,7 @@ class Perfume(Base):
             name="ck_source_longevity",
         ),
         CheckConstraint(
-            "personal_longevity IN ('very_short', 'short','moderate', 'long', 'very_long')",
+            "personal_longevity IN ('very_short', 'short', 'moderate', 'long', 'very_long')",
             name="ck_personal_longevity",
         ),
         CheckConstraint(

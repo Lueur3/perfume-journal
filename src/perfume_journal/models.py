@@ -8,6 +8,7 @@ from pydantic import (
     HttpUrl,
     PositiveFloat,
     StringConstraints,
+    ValidationInfo,
     field_validator,
 )
 
@@ -74,8 +75,23 @@ class CollectionItemDetails(CollectionItem):
     wearings: list[Wearing]
 
 
-class CollectionItemStatusUpdate(BaseModel):
-    status: CollectionItemStatus
+class CollectionItemUpdate(BaseModel):
+    kind: CollectionItemKind | None = None
+    initial_volume_ml: PositiveFloat | None = None
+    acquired_on: date | None = None
+    status: CollectionItemStatus | None = None
+
+    @field_validator("kind", "status", mode="after")
+    @classmethod
+    def reject_null(
+        cls,
+        value: CollectionItemKind | CollectionItemStatus | None,
+        info: ValidationInfo,
+    ) -> CollectionItemKind | CollectionItemStatus:
+        if value is None:
+            raise ValueError(f"{info.field_name} can't be None.")
+
+        return value
 
 
 class PerfumeSource(BaseModel):

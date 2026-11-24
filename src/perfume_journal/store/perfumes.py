@@ -110,10 +110,10 @@ async def get_perfume_details(
 
         collection_items_id = [item.id for item in orm_collection_items]
 
-        statement_wering = select(orm.Wearing).where(
+        statement_wearing = select(orm.Wearing).where(
             orm.Wearing.collection_item_id.in_(collection_items_id)
         )
-        result_wearing_query = await session.execute(statement_wering)
+        result_wearing_query = await session.execute(statement_wearing)
         orm_wearings = result_wearing_query.scalars().all()
 
     wearings_by_items_id: dict[int, list[mdl.Wearing]] = defaultdict(list)
