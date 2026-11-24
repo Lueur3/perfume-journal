@@ -360,3 +360,39 @@ async def test_delete_collection_item_with_wearings_returns_409(
     second_details = second_details_response.json()
 
     assert first_details == second_details
+
+
+@pytest.mark.anyio
+async def test_get_collection_item_by_id(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    assert item_response.status_code == 201
+    collection_item_id = item_response.json()["id"]
+
+    target_item_response = await async_client.get(
+        f"/collection-items/{collection_item_id}"
+    )
+
+    assert target_item_response.status_code == 200
+    assert target_item_response.json() == item_response.json()
+
+
+@pytest.mark.anyio
+async def test_get_collection_item_missing_returns_404(
+    async_client: AsyncClient,
+) -> None:
+    item_response = await async_client.get("/collection-items/999")
+
+    assert item_response.status_code == 404
+    assert item_response.json()["detail"] == "Collection item not found."

@@ -319,3 +319,59 @@ async def test_delete_collection_item_with_wearings_raises_conflict(
 
     assert details.collection_items[0].id == item.id
     assert details.collection_items[0].wearings == [wearing]
+
+
+@pytest.mark.anyio
+async def test_get_collection_item_by_id(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    perfume = await perfume_store.create_perfume(
+        session_factory,
+        mdl.PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
+    )
+    item = await item_store.create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=mdl.CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
+    )
+
+    target_item = await item_store.get_collection_item(session_factory, item.id)
+
+    assert item == target_item
+
+
+@pytest.mark.anyio
+async def test_get_collection_item_archived_by_id(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    perfume = await perfume_store.create_perfume(
+        session_factory,
+        mdl.PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
+    )
+    item = await item_store.create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=mdl.CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
+    )
+
+    archived_item = await item_store.set_collection_item_status(
+        session_factory, item.id, "archived"
+    )
+
+    target_item = await item_store.get_collection_item(
+        session_factory, archived_item.id
+    )
+
+    assert archived_item == target_item
+
+
+@pytest.mark.anyio
+async def test_get_collection_item_not_found(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    with pytest.raises(CollectionItemNotFoundError):
+        await item_store.get_collection_item(session_factory, collection_item_id=999)

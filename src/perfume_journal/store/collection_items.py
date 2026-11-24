@@ -39,6 +39,19 @@ async def create_collection_item(
     return mdl_collection_item
 
 
+async def get_collection_item(
+    session_factory: async_sessionmaker[AsyncSession],
+    collection_item_id: int,
+) -> mdl.CollectionItem:
+    async with session_factory() as session:
+        collection_item = await session.get(orm.CollectionItem, collection_item_id)
+
+        if collection_item is None:
+            raise CollectionItemNotFoundError("Collection item not found.")
+
+    return mdl.CollectionItem.model_validate(collection_item, from_attributes=True)
+
+
 async def list_collection_items(
     session_factory: async_sessionmaker[AsyncSession],
     status: mdl.CollectionItemStatus,

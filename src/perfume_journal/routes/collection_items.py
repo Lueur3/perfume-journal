@@ -80,3 +80,19 @@ async def list_collection_items(
     status: mdl.CollectionItemStatus = "active",
 ) -> list[mdl.CollectionItem]:
     return await sql_store.list_collection_items(session_factory, status)
+
+
+@router.get(
+    "/collection-items/{collection_item_id}",
+    response_model=mdl.CollectionItem,
+    status_code=status.HTTP_200_OK,
+)
+async def get_collection_item(
+    session_factory: SessionFactoryDep, collection_item_id: int
+) -> mdl.CollectionItem:
+    try:
+        return await sql_store.get_collection_item(session_factory, collection_item_id)
+    except CollectionItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
