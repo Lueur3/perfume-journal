@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -102,6 +102,13 @@ def test_wearing_create_defaults_optional_fields_to_none() -> None:
     assert test_wearing_create_item.worn_at.tzinfo is not None
     assert test_wearing_create_item.rating is None
     assert test_wearing_create_item.comment is None
+
+
+def test_wearing_create_normalizes_worn_at_to_utc() -> None:
+    wearing = mdl.WearingCreate.model_validate({"worn_at": "2026-10-02T09:30:00+03:00"})
+
+    assert wearing.worn_at == datetime(2026, 10, 2, 6, 30, tzinfo=UTC)
+    assert wearing.worn_at.utcoffset() == timedelta(0)
 
 
 def test_wearing_create_invalid_rates() -> None:

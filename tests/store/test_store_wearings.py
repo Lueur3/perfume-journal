@@ -423,3 +423,86 @@ async def test_delete_wearing_not_found(
 ) -> None:
     with pytest.raises(WearingNotFoundError):
         await wearing_store.delete_wearing(session_factory, wearing_id=999)
+
+
+@pytest.mark.anyio
+async def test_get_wearing_by_id(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    perfume = await perfume_store.create_perfume(
+        session_factory,
+        mdl.PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
+    )
+    item = await item_store.create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=mdl.CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
+    )
+    wearing = await wearing_store.create_wearing(
+        session_factory,
+        collection_item_id=item.id,
+        data=mdl.WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+            rating=6,
+            comment="Test comment",
+        ),
+    )
+
+    await wearing_store.create_wearing(
+        session_factory,
+        collection_item_id=item.id,
+        data=mdl.WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+            rating=10,
+            comment="Test comment",
+        ),
+    )
+
+    target_wearing = await wearing_store.get_wearing(session_factory, wearing.id)
+
+    assert target_wearing == wearing
+
+
+@pytest.mark.anyio
+async def test_get_wearing_archived_by_id(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    perfume = await perfume_store.create_perfume(
+        session_factory,
+        mdl.PerfumeCreate(brand="Creed", name="Aventus", concentration="EDT"),
+    )
+    item = await item_store.create_collection_item(
+        session_factory,
+        perfume_id=perfume.id,
+        data=mdl.CollectionItemCreate(
+            kind="sample", initial_volume_ml=1.5, acquired_on=date(2026, 9, 15)
+        ),
+    )
+
+    wearing = await wearing_store.create_wearing(
+        session_factory,
+        collection_item_id=item.id,
+        data=mdl.WearingCreate(
+            worn_at=datetime.fromisoformat("2026-10-02T09:30:00+03:00"),
+            rating=6,
+            comment="Test comment",
+        ),
+    )
+
+    await item_store.update_collection_item(
+        session_factory, item.id, mdl.CollectionItemUpdate(status="archived")
+    )
+
+    target_wearing = await wearing_store.get_wearing(session_factory, wearing.id)
+
+    assert target_wearing == wearing
+
+
+@pytest.mark.anyio
+async def test_get_wearing_not_found(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    with pytest.raises(WearingNotFoundError):
+        await wearing_store.get_wearing(session_factory, wearing_id=999)

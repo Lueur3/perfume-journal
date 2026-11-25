@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import pytest
 from httpx2 import AsyncClient
 
@@ -125,18 +123,13 @@ async def test_archive_and_restore_collection_item(async_client: AsyncClient) ->
     assert item_archived["wearings"][0]["rating"] == 5
     assert item_archived["wearings"][0]["comment"] == "Test comment"
     assert item_archived["wearings"][0]["collection_item_id"] == archived_item["id"]
-    assert datetime.fromisoformat(
-        item_archived["wearings"][0]["worn_at"]
-    ) == datetime.fromisoformat("2026-10-02T09:30:00+03:00")
     assert len(item_archived["wearings"]) == 1
     wearing = item_archived["wearings"][0]
 
     assert wearing["id"] == wearing_id_1
     assert wearing["rating"] == 5
     assert wearing["comment"] == "Test comment"
-    assert datetime.fromisoformat(wearing["worn_at"]) == datetime.fromisoformat(
-        "2026-10-02T09:30:00+03:00"
-    )
+    assert wearing["worn_at"] == "2026-10-02T06:30:00Z"
 
     active_item_response = await async_client.patch(
         f"/collection-items/{collection_item_id}", json={"status": "active"}

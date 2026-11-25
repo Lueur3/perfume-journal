@@ -43,6 +43,18 @@ async def create_wearing(
     return mdl_wearing
 
 
+async def get_wearing(
+    session_factory: async_sessionmaker[AsyncSession], wearing_id: int
+) -> mdl.Wearing:
+    async with session_factory() as session:
+        wearing = await session.get(orm.Wearing, wearing_id)
+
+        if wearing is None:
+            raise WearingNotFoundError("Wearing not found.")
+
+        return mdl.Wearing.model_validate(wearing, from_attributes=True)
+
+
 async def list_wearings(
     session_factory: async_sessionmaker[AsyncSession],
     collection_item_id: int,
