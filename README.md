@@ -1,422 +1,161 @@
 # Perfume Journal
 
-Personal perfume collection tracker and journal.
+A personal perfume collection and wearing journal, currently available through
+an HTTP API with interactive Swagger documentation.
 
-The project provides a PostgreSQL-backed API for creating perfume records,
-adding physical samples or bottles to them, and recording wearings for those
-collection items. A perfume can be retrieved with its collection items,
-wearing history, and calculated average rating. Committed data remains
-available after the application restarts. Existing perfume records can be
-updated without changing their IDs. Perfume records can be listed with their
-basic fields and searched by brand or name.
-Physical collection items can be archived and restored without losing their
-wearing history. Archived items cannot receive new wearings.
-Collection items can be listed separately by their active or archived status.
-Items without wearing history can also be permanently deleted.
-Perfume records can be permanently deleted only when they have no collection
-items, including archived ones.
-Individual wearings can be permanently deleted from active or archived items
-to correct the journal.
+A **perfume** describes a fragrance. A **collection item** is a physical sample
+or bottle of that perfume. A **wearing** records when an item was worn, with an
+optional rating and comment.
 
-## Requirements
+- Create, view, edit, and delete perfumes, collection items, and wearings.
+- Search perfumes by brand or name and filter wearing history by time range.
+- Keep source characteristics and personal impressions in separate fields.
+- Archive and restore collection items while retaining their history.
+- View a perfume with its collection items, wearings, and average rating.
 
-- Python 3.14
-- [uv](https://docs.astral.sh/uv/)
-- PostgreSQL 18 for the API and integration tests
+Data is stored in PostgreSQL and remains available after application restarts.
 
-## Install
+## Local setup
+
+You need Python 3.14, [uv](https://docs.astral.sh/uv/), and a running PostgreSQL 18
+server with a login role that can own the project databases. The commands below
+use PowerShell.
+
+### Install
 
 ```powershell
+git clone https://github.com/Lueur3/perfume-journal.git
+cd perfume-journal
 uv sync
 ```
 
-## Run
+### Configure the database
 
-Configure the development database and apply migrations as described below
-before starting the server.
+Create an empty database named `perfume_journal` in pgAdmin or psql, with your
+PostgreSQL role as its owner.
+
+Copy the configuration template into the project root.
+
+```powershell
+Copy-Item .env.example .env
+```
+
+In `.env`, set `PERFUME_DB_USER` and `PERFUME_DB_PASSWORD` to your PostgreSQL
+credentials. Adjust the host, port, and database name if needed. The available
+settings are listed in [.env.example](.env.example).
+
+The application loads `.env` automatically. Existing environment variables take
+precedence over values in the file. Git ignores `.env`.
+
+Check the connection and apply the checked-in migrations.
+
+```powershell
+uv run python -m perfume_journal.db_check
+uv run alembic upgrade head
+```
+
+The connection check prints the configured database name, normally
+`perfume_journal`. Migrations must be applied before using the API.
+
+### Start the API
 
 ```powershell
 uv run uvicorn perfume_journal.api:app --reload
 ```
 
-Interactive API documentation is available at <http://127.0.0.1:8000/docs>, and
-the OpenAPI schema is available at <http://127.0.0.1:8000/openapi.json>.
-
-## PostgreSQL setup and migrations
-
-SQLAlchemy ORM models and the initial Alembic migration describe the
-`perfumes`, `collection_items`, and `wearings` tables used by the API.
-
-Create an empty PostgreSQL database named `perfume_journal`. Copy
-`.env.example` to `.env` in the project root and fill in your local connection
-parameters, including the PostgreSQL role and password. Keep `.env` private;
-only the template belongs in Git.
-
-The shared configuration function loads `.env` with python-dotenv. Existing
-environment variables take precedence over values in the file. No
-`--env-file` argument or repeated PowerShell assignments are needed.
-
-Check the connection:
-
-```powershell
-uv run python -m perfume_journal.db_check
-```
-
-The diagnostic uses an async session to run `SELECT current_database()`.
-The expected output is `perfume_journal`. Keep passwords out of source files
-and command output.
-
-Apply the checked-in migrations and inspect the current database revision:
-
-```powershell
-uv run alembic upgrade head
-uv run alembic current
-```
-
-The initial revision is `25bdb52d3933`. It creates the three domain tables;
-Alembic tracks the applied revision in its own `alembic_version` table.
-Migration files live in `migrations/versions`. Review generated migrations
-before applying them. Downgrading the initial migration drops the three domain
-tables and their data.
-
-### PostgreSQL storage operations
-
-`perfume_journal.sqlalchemy_store.create_perfume()` creates a perfume through
-an async session factory and returns its Pydantic representation after a
-successful commit. The shared normalization function produces duplicate
-detection keys.
-
-Only a unique violation (`23505`) of `uq_brand_name_concentration_keys` is
-translated into `DuplicatePerfumeError`. Other integrity errors propagate
-without that translation.
-
-`perfume_journal.sqlalchemy_store.update_perfume()` loads an existing perfume
-and replaces its brand, name, concentration, and normalized keys in one
-transaction. A missing record raises `PerfumeNotFoundError`. A uniqueness
-conflict raises `DuplicatePerfumeError`, and the transaction is rolled back.
-The operation returns the updated Pydantic `Perfume` after a successful commit.
-
-`perfume_journal.sqlalchemy_store.get_perfume()` opens a session and retrieves
-one perfume by its primary key. It returns a Pydantic `Perfume` containing
-`id`, `brand`, `name`, and `concentration`, or raises the shared
-`PerfumeNotFoundError` if the record does not exist. It does not assemble
-collection items or wearings.
-
-`perfume_journal.sqlalchemy_store.list_perfumes()` returns basic perfume records
-ordered by ascending ID. An optional `q` filters by a case-insensitive substring
-of the brand or name. The database treats `%` and `_` in the search text as
-literal characters.
-
-`perfume_journal.sqlalchemy_store.delete_perfume()` deletes a perfume in one
-transaction. A missing record raises `PerfumeNotFoundError`. Any collection
-item, including an archived one, prevents deletion through the existing foreign
-key. SQLSTATE `23001` and constraint `collection_items_perfume_id_fkey` are
-translated into `PerfumeHasCollectionItemsError`; the transaction is rolled
-back and existing data is preserved. Other integrity errors propagate.
-
-`perfume_journal.sqlalchemy_store.create_collection_item()` checks that the
-parent perfume exists and inserts a physical sample or bottle in the same
-session and transaction. A missing parent raises `PerfumeNotFoundError`.
-PostgreSQL assigns the item ID and the default `active` status. The operation
-returns a Pydantic `CollectionItem` after a successful commit. Volume and
-acquisition date may be omitted, and identical items are allowed as separate
-physical instances.
-
-`perfume_journal.sqlalchemy_store.set_collection_item_status()` changes an
-existing item's status to `active` or `archived` in one transaction. Repeating
-the current status succeeds. The item ID, perfume relation, and wearing history
-are preserved; a missing item raises `CollectionItemNotFoundError`.
-
-`perfume_journal.sqlalchemy_store.list_collection_items()` returns collection
-items with the requested status, ordered by ascending ID. Filtering happens
-in PostgreSQL, and an empty result produces an empty list.
-
-`perfume_journal.sqlalchemy_store.delete_collection_item()` deletes an active
-or archived item in one transaction. A missing item raises
-`CollectionItemNotFoundError`. The existing foreign key prevents deletion when
-wearings reference the item: SQLSTATE `23001` and constraint
-`wearings_collection_item_id_fkey` are translated into
-`CollectionItemHasWearingsError`. The transaction is rolled back, preserving the
-item and its history. Other integrity errors propagate. The parent perfume is
-preserved after a successful item deletion.
-
-`perfume_journal.sqlalchemy_store.create_wearing()` checks that the parent
-collection item exists and inserts a wearing in the same session and
-transaction. A missing parent raises the shared `CollectionItemNotFoundError`.
-An archived parent raises `CollectionItemArchivedError` before insertion.
-It returns a Pydantic `Wearing` after a successful commit. The supplied wearing
-time is preserved as an instant; rating and comment may be omitted. Repeated
-wearings with identical data are allowed and receive separate IDs.
-
-`perfume_journal.sqlalchemy_store.delete_wearing()` deletes one wearing in a
-transaction, regardless of its item's status. A missing record raises
-`WearingNotFoundError`. The parent item, its status, the perfume, and other
-wearings are preserved. Subsequent details requests calculate the average
-rating from the remaining wearings.
-
-`perfume_journal.sqlalchemy_store.get_perfume_details()` returns a Pydantic
-`PerfumeDetails` with the perfume's collection items, each item's wearing
-history, and the average of all specified wearing ratings. It reads the
-perfume, its items, and their wearings in three queries within one session.
-A missing perfume raises `PerfumeNotFoundError`. Empty histories remain empty
-lists; unrated wearings remain in the history, and the average is `None` when
-no wearing has a rating. Items and wearings belonging to other perfumes are
-excluded. Collection order is not guaranteed.
-Archived items and their wearings remain included in the details and average.
-
-The HTTP handlers await the corresponding SQLAlchemy operations.
-`GET /perfumes/{perfume_id}` calls `get_perfume_details()` to preserve the nested
-response contract; `GET /perfumes` calls `list_perfumes()` for the basic list.
-FastAPI's lifespan creates the async engine and session factory at startup and
-disposes the engine at shutdown. A dependency retrieves the factory from
-`app.state`; each storage operation opens and closes its own session.
-
-## API
-
-### `POST /perfumes`
-
-Creates a perfume record. `brand` and `name` are required;
-`concentration` is optional. The server assigns the `id`.
-
-Example request:
-
-```json
-{
-  "brand": "Creed",
-  "name": "Aventus",
-  "concentration": "EDP"
-}
-```
-
-Responses:
-
-- `201 Created` — the perfume was created;
-- `409 Conflict` — a perfume with the same normalized brand, name, and
-  concentration already exists;
-- `422 Unprocessable Content` — the request body is invalid.
-
-### `PUT /perfumes/{perfume_id}`
-
-Replaces the editable fields of an existing perfume. `brand` and `name` are
-required; `concentration` may be omitted or set to `null`, both of which clear
-its previous value. Validation and normalization follow the creation rules.
-The response contains the updated fields and the original `id`.
-
-Responses:
-
-- `200 OK` — the perfume was updated;
-- `404 Not Found` — the perfume does not exist;
-- `409 Conflict` — the replacement values conflict with another perfume's
-  normalized brand, name, and concentration; existing data is preserved;
-- `422 Unprocessable Content` — the request body is invalid.
-
-### `DELETE /perfumes/{perfume_id}`
-
-Permanently deletes a perfume only when it has no collection items. Archived
-items also prevent deletion.
-
-Responses:
-
-- `204 No Content` — the perfume was deleted; the response body is empty;
-- `404 Not Found` — the perfume does not exist;
-- `409 Conflict` — the perfume has collection items; existing data is preserved.
-
-### `POST /perfumes/{perfume_id}/collection-items`
-
-Adds one physical sample or bottle to an existing perfume record. New
-collection items are created with the `active` status. The server assigns the
-item `id` and takes `perfume_id` from the URL.
-
-Example request:
-
-```json
-{
-  "kind": "sample",
-  "initial_volume_ml": 1.5,
-  "acquired_on": "2026-05-09"
-}
-```
-
-Responses:
-
-- `201 Created` — the collection item was created;
-- `404 Not Found` — the referenced perfume does not exist;
-- `422 Unprocessable Content` — the request body is invalid.
-
-### `GET /collection-items`
-
-Returns collection items ordered by ascending `id`, filtered by the `status`
-query parameter. The default is `active`; use
-`/collection-items?status=archived` to view archived items. Each result contains
-the item's fields and its `perfume_id`, without nested wearing history.
-
-Responses:
-
-- `200 OK` — a JSON array of matching items, or `[]` when none match;
-- `422 Unprocessable Content` — `status` is neither `active` nor `archived`.
-
-### `PATCH /collection-items/{collection_item_id}`
-
-Archives or restores a physical collection item. The required `status` field
-accepts `active` or `archived`. The response contains the updated item with its
-original ID. Repeating the current status succeeds, and existing wearings are
-preserved. The existing database schema supports this operation.
-
-Example request:
-
-```json
-{
-  "status": "archived"
-}
-```
-
-Responses:
-
-- `200 OK` — the requested status was applied;
-- `404 Not Found` — the collection item does not exist;
-- `422 Unprocessable Content` — the request body is invalid.
-
-### `DELETE /collection-items/{collection_item_id}`
-
-Permanently deletes an active or archived item only when it has no wearings.
-The parent perfume remains. An item with wearing history must be archived
-instead of deleted.
-
-Responses:
-
-- `204 No Content` — the item was deleted; the response body is empty;
-- `404 Not Found` — the collection item does not exist;
-- `409 Conflict` — the item has wearing history; existing data is preserved.
-
-### `POST /collection-items/{collection_item_id}/wearings`
-
-Records one wearing of an existing collection item. `worn_at` is required and
-must include a timezone offset. `rating` is an optional integer from 1 to 10,
-and `comment` is optional. The server assigns the wearing `id` and takes
-`collection_item_id` from the URL.
-
-Example request:
-
-```json
-{
-  "worn_at": "2026-10-02T09:30:00+03:00",
-  "rating": 5,
-  "comment": "Test comment"
-}
-```
-
-Responses:
-
-- `201 Created` — the wearing was created;
-- `404 Not Found` — the referenced collection item does not exist;
-- `409 Conflict` — the collection item is archived; restore it before recording
-  another wearing;
-- `422 Unprocessable Content` — the request body is invalid.
-
-### `GET /collection-items/{collection_item_id}/wearings`
-
-Lists wearings for one active or archived collection item, newest first by
-`worn_at`. The optional query parameters `worn_from` (inclusive) and
-`worn_before` (exclusive) accept timestamps with `Z` or a numeric UTC
-offset. Each bound can be used on its own. Omitting both returns the full
-history.
-
-Example for November 5 in UTC:
-
-```text
-GET /collection-items/1/wearings?worn_from=2026-11-05T00:00:00Z&worn_before=2026-11-06T00:00:00Z
-```
-
-- `200 OK` returns an array of wearings or `[]` if none match.
-- `404 Not Found` indicates that the collection item does not exist.
-- `422 Unprocessable Content` indicates an invalid timestamp, a missing
-  timezone offset, or a start after the end.
-
-### `DELETE /wearings/{wearing_id}`
-
-Permanently deletes one wearing, including from an archived item. The item's
-status is preserved. The next details response reflects the remaining history
-and ratings; the average is `null` when no rated wearings remain. An item with
-no remaining wearings can then be deleted through the item deletion endpoint.
-
-Responses:
-
-- `204 No Content` — the wearing was deleted; the response body is empty;
-- `404 Not Found` — the wearing does not exist, including on repeated deletion.
-
-### `GET /perfumes`
-
-Returns perfume records ordered by ascending `id`. Each record contains `id`,
-`brand`, `name`, and `concentration`. Perfumes without collection items are
-included.
-
-Use the optional query parameter `q` to search by a substring of the brand or
-name, ignoring case. For example, `/perfumes?q=AVEN` matches `Aventus`. Leading
-and trailing whitespace is trimmed. An omitted or blank `q` returns all records.
-The response is `200 OK` with a JSON array, or `[]` when there are no matches.
-
-### `GET /perfumes/{perfume_id}`
-
-Returns a perfume together with its collection items, each item's wearing
-history, and the average of all specified wearing ratings. Wearings without a
-rating remain in the history but do not affect the average. `average_rating` is
-`null` when no wearing has a rating.
-Archived collection items and their wearing history are included.
-
-Responses:
-
-- `200 OK` — the assembled perfume details were returned;
-- `404 Not Found` — the referenced perfume does not exist.
-
-## Database tests
-
-The full test suite requires a running PostgreSQL server and a separate,
-migrated test database. Create an empty database named `perfume_journal_test`
-on the same server, accessible by the role configured in `.env`. Set:
-
-```dotenv
-PERFUME_TEST_DB_NAME=perfume_journal_test
-```
-
-Keep `PERFUME_DB_NAME` pointed at the development database. An empty test
-database name or one equal to the development database name is rejected.
-
-Apply the existing migrations to the test database:
+Open the [interactive API documentation](http://127.0.0.1:8000/docs) to send
+requests and inspect responses. The [OpenAPI schema](http://127.0.0.1:8000/openapi.json)
+describes the endpoints, fields, and validation rules.
+
+## First use
+
+In `/docs`, expand an operation, select **Try it out**, enter its parameters and
+JSON body, then select **Execute**.
+
+1. Create a perfume using `POST /perfumes` with the body below. The response is
+   `201 Created`. Save the returned `id` as your `perfume_id`.
+
+   ```json
+   {
+     "brand": "Example House",
+     "name": "Journal Demo",
+     "concentration": "EDP"
+   }
+   ```
+
+2. Use that `perfume_id` in `POST /perfumes/{perfume_id}/collection-items` to add
+   a sample. Save the response's `id` as your `collection_item_id`.
+
+   ```json
+   {
+     "kind": "sample",
+     "initial_volume_ml": 2.0
+   }
+   ```
+
+3. Use that `collection_item_id` in
+   `POST /collection-items/{collection_item_id}/wearings` to record a wearing.
+   Replace the example timestamp with the time you wore it, including its UTC
+   offset or `Z`.
+
+   ```json
+   {
+     "worn_at": "2026-11-26T09:30:00+03:00",
+     "rating": 8,
+     "comment": "Comfortable for everyday wear"
+   }
+   ```
+
+4. Call `GET /perfumes/{perfume_id}` with the perfume ID from step 1. The response
+   includes the sample and its wearing, and `average_rating` is `8`.
+
+You can use the PATCH operations in `/docs` to edit a collection item, a wearing,
+or the perfume's source characteristics and personal impressions. Use
+`PUT /perfumes/{perfume_id}` to replace its brand, name, and concentration.
+
+## Working with your data
+
+- Perfume brand and name are required. Concentration is optional. A duplicate
+  combination of brand, name, and concentration is rejected with `409 Conflict`,
+  ignoring case and surrounding whitespace.
+- Archive an item with `PATCH /collection-items/{collection_item_id}` and
+  `{"status": "archived"}`. Its history remains readable, and existing wearings
+  can be corrected or deleted. Restore it with `{"status": "active"}` before
+  adding new wearings.
+- A perfume can be deleted only when it has no collection items, including
+  archived ones. An item can be deleted only when it has no wearings. Deletions
+  are permanent.
+- Wearing timestamps require a timezone and are returned in UTC. For example,
+  `09:30+03:00` is returned as `06:30Z` on the same date.
+- PATCH preserves omitted fields. Explicit `null` clears optional fields such as
+  volume, acquisition date, rating, or comment. Item kind, item status, and wearing
+  time reject explicit `null`. An empty object `{}` preserves all values.
+- Ratings range from 1 to 10. A perfume's average includes rated wearings from
+  active and archived items. Unrated wearings are excluded from the calculation,
+  and the average is `null` when there are no ratings.
+
+## Development and checks
+
+The API and store tests require a separate PostgreSQL database. Create an empty
+database named `perfume_journal_test`, owned by the same role used for local
+development. Set `PERFUME_TEST_DB_NAME=perfume_journal_test` in `.env`, keeping
+`PERFUME_DB_NAME` pointed at the development database.
+
+Apply migrations to the test database and run the checks.
 
 ```powershell
 uv run alembic -x environment=test upgrade head
-uv run alembic -x environment=test current
-```
-
-Without `-x environment=test`, Alembic continues to use the development
-database. Unknown `environment` values are rejected.
-
-Database tests use AnyIO with the asyncio backend. For each store test, the
-session factory is bound to one connection inside an external transaction,
-with sessions using savepoints. The external transaction is rolled back after
-the test, including changes committed by the operation under test. PostgreSQL
-sequence values are not reset by this rollback.
-
-API tests use HTTPX2's `AsyncClient` and `ASGITransport` with AnyIO. They
-override `get_session_factory()` with the same isolated test factory using
-`monkeypatch.setitem()` on `app.dependency_overrides`. The transport does not
-start the application's lifespan; the database fixtures provide its resources.
-API requests exercise real PostgreSQL operations, and their changes are
-rolled back after each test. IDs are compared using values returned by the
-API, and wearing timestamps are compared as timezone-aware instants.
-
-Run just the database tests:
-
-```powershell
-uv run pytest tests/store -q
-```
-
-## Development checks
-
-```powershell
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy --strict .
 uv lock --check
 ```
+
+The test database name must differ from the development database name. Tests
+roll back their data changes after each test. PostgreSQL ID sequences can still
+advance.
+
+Run `uv run alembic upgrade head` against the development database after pulling
+changes that introduce migrations. Migration files are in
+[migrations/versions](migrations/versions).
