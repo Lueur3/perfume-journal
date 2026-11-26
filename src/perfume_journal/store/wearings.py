@@ -83,6 +83,28 @@ async def list_wearings(
         ]
 
 
+async def update_wearing(
+    session_factory: async_sessionmaker[AsyncSession],
+    wearing_id: int,
+    data: mdl.WearingUpdate,
+) -> mdl.Wearing:
+    async with session_factory.begin() as session:
+        wearing = await session.get(orm.Wearing, wearing_id)
+
+        if wearing is None:
+            raise WearingNotFoundError("Wearing not found.")
+
+        new_data = data.model_dump(exclude_unset=True)
+        for field, value in new_data.items():
+            setattr(wearing, field, value)
+
+        await session.flush()
+
+        mdl_wearing = mdl.Wearing.model_validate(wearing, from_attributes=True)
+
+    return mdl_wearing
+
+
 async def delete_wearing(
     session_factory: async_sessionmaker[AsyncSession], wearing_id: int
 ) -> None:

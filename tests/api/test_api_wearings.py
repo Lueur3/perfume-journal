@@ -333,3 +333,102 @@ async def test_get_missing_wearing_returns_404(
 
     assert get_wearing_response.status_code == 404
     assert get_wearing_response.json()["detail"] == "Wearing not found."
+
+
+@pytest.mark.anyio
+async def test_update_wearing(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    assert item_response.status_code == 201
+    collection_item_id = item_response.json()["id"]
+
+    wearing_response = await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+    assert wearing_response.status_code == 201
+    wearing_id = wearing_response.json()["id"]
+
+    updated_wearing_response = await async_client.patch(
+        f"/wearings/{wearing_id}",
+        json={"rating": 10, "worn_at": "2026-11-01T12:00:00+03:00"},
+    )
+    assert updated_wearing_response.status_code == 200
+    updated_wearing = updated_wearing_response.json()
+
+    assert updated_wearing["id"] == wearing_id
+    assert updated_wearing["collection_item_id"] == collection_item_id
+    assert updated_wearing["rating"] == 10
+    assert updated_wearing["comment"] == "Test comment"
+    assert updated_wearing["worn_at"] == "2026-11-01T09:00:00Z"
+
+    target_wearing_response = await async_client.get(f"/wearings/{wearing_id}")
+    assert target_wearing_response.status_code == 200
+    assert target_wearing_response.json() == updated_wearing
+
+    perfume_details_response = await async_client.get(f"/perfumes/{perfume_id}")
+    assert perfume_details_response.json()["average_rating"] == 10
+
+
+@pytest.mark.anyio
+async def test_update_wearing_null_worn_at_returns_422(
+    async_client: AsyncClient,
+) -> None:
+    perfume_response = await async_client.post(
+        "/perfumes",
+        json={"brand": "Creed", "name": "Aventus", "concentration": "edt"},
+    )
+    assert perfume_response.status_code == 201
+    perfume_id = perfume_response.json()["id"]
+
+    item_response = await async_client.post(
+        f"/perfumes/{perfume_id}/collection-items",
+        json={"kind": "sample", "initial_volume_ml": 1.5, "acquired_on": "2026-05-09"},
+    )
+    assert item_response.status_code == 201
+    collection_item_id = item_response.json()["id"]
+
+    wearing_response = await async_client.post(
+        f"/collection-items/{collection_item_id}/wearings",
+        json={
+            "worn_at": "2026-10-02T09:30:00+03:00",
+            "rating": 5,
+            "comment": "Test comment",
+        },
+    )
+    assert wearing_response.status_code == 201
+    wearing = wearing_response.json()
+    wearing_id = wearing["id"]
+
+    updated_wearing_response = await async_client.patch(
+        f"/wearings/{wearing_id}", json={"worn_at": None}
+    )
+    assert updated_wearing_response.status_code == 422
+
+    detail_response = await async_client.get(f"/wearings/{wearing_id}")
+    assert detail_response.json() == wearing
+
+
+@pytest.mark.anyio
+async def test_update_missing_wearing_returns_404(
+    async_client: AsyncClient,
+) -> None:
+    response = await async_client.patch("/wearings/999", json={"rating": 5})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Wearing not found."

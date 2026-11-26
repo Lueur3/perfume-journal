@@ -76,6 +76,20 @@ class Wearing(WearingCreate):
     collection_item_id: int
 
 
+class WearingUpdate(BaseModel):
+    worn_at: AwareDatetime | None = None
+    rating: WearingRating | None = None
+    comment: CleanString | None = None
+
+    @field_validator("worn_at")
+    @classmethod
+    def normalize_worn_at(cls, value: AwareDatetime | None) -> AwareDatetime:
+        if value is None:
+            raise ValueError("worn_at can't be None.")
+
+        return value.astimezone(UTC)
+
+
 class CollectionItemDetails(CollectionItem):
     wearings: list[Wearing]
 
