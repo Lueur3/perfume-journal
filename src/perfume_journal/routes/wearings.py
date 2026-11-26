@@ -76,3 +76,31 @@ async def delete_wearing(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+
+
+@router.get(
+    "/wearings/{wearing_id}", response_model=mdl.Wearing, status_code=status.HTTP_200_OK
+)
+async def get_wearing(
+    wearing_id: int, session_factory: SessionFactoryDep
+) -> mdl.Wearing:
+    try:
+        return await sql_store.get_wearing(session_factory, wearing_id)
+    except WearingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+
+
+@router.patch(
+    "/wearings/{wearing_id}", response_model=mdl.Wearing, status_code=status.HTTP_200_OK
+)
+async def update_wearing(
+    wearing_id: int, session_factory: SessionFactoryDep, body: mdl.WearingUpdate
+) -> mdl.Wearing:
+    try:
+        return await sql_store.update_wearing(session_factory, wearing_id, body)
+    except WearingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

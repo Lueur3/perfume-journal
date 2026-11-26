@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -104,6 +104,13 @@ def test_wearing_create_defaults_optional_fields_to_none() -> None:
     assert test_wearing_create_item.comment is None
 
 
+def test_wearing_create_normalizes_worn_at_to_utc() -> None:
+    wearing = mdl.WearingCreate.model_validate({"worn_at": "2026-10-02T09:30:00+03:00"})
+
+    assert wearing.worn_at == datetime(2026, 10, 2, 6, 30, tzinfo=UTC)
+    assert wearing.worn_at.utcoffset() == timedelta(0)
+
+
 def test_wearing_create_invalid_rates() -> None:
     with pytest.raises(ValidationError):
         mdl.WearingCreate.model_validate(
@@ -137,6 +144,31 @@ def test_correct_wearing() -> None:
     assert wearing.worn_at.tzinfo is not None
     assert wearing.rating == 5
     assert wearing.comment == "Test comment"
+
+
+def test_wearing_update_allows_omitted_fields() -> None:
+    wearing = mdl.WearingUpdate.model_validate({})
+
+    assert wearing.model_dump(exclude_unset=True) == {}
+
+
+def test_wearing_update_clears_rating_and_comment_with_null() -> None:
+    wearing = mdl.WearingUpdate.model_validate({"rating": None, "comment": None})
+
+    assert wearing.model_dump(exclude_unset=True) == {"rating": None, "comment": None}
+
+
+def test_wearing_update_rejects_null_worn_at() -> None:
+    with pytest.raises(ValidationError):
+        mdl.WearingUpdate.model_validate({"worn_at": None})
+
+
+def test_wearing_update_normalizes_worn_at_to_utc() -> None:
+    wearing = mdl.WearingUpdate.model_validate({"worn_at": "2026-10-02T09:30:00+03:00"})
+
+    assert wearing.worn_at is not None
+    assert wearing.worn_at == datetime(2026, 10, 2, 6, 30, tzinfo=UTC)
+    assert wearing.worn_at.utcoffset() == timedelta(0)
 
 
 def test_nested_details_perfume_model() -> None:

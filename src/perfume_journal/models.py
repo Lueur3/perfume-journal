@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -65,10 +65,29 @@ class WearingCreate(BaseModel):
     rating: WearingRating | None = None
     comment: CleanString | None = None
 
+    @field_validator("worn_at")
+    @classmethod
+    def normalize_worn_at(cls, value: datetime) -> datetime:
+        return value.astimezone(UTC)
+
 
 class Wearing(WearingCreate):
     id: int
     collection_item_id: int
+
+
+class WearingUpdate(BaseModel):
+    worn_at: AwareDatetime | None = None
+    rating: WearingRating | None = None
+    comment: CleanString | None = None
+
+    @field_validator("worn_at")
+    @classmethod
+    def normalize_worn_at(cls, value: AwareDatetime | None) -> AwareDatetime:
+        if value is None:
+            raise ValueError("worn_at can't be None.")
+
+        return value.astimezone(UTC)
 
 
 class CollectionItemDetails(CollectionItem):

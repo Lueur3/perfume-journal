@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Any
 
 import pytest
@@ -99,9 +98,10 @@ async def test_get_perfume_details(async_client: AsyncClient) -> None:
         details["collection_items"][0]["wearings"][0]["collection_item_id"]
         == collection_item_id
     )
-    assert datetime.fromisoformat(
+    assert (
         details["collection_items"][0]["wearings"][0]["worn_at"]
-    ) == datetime.fromisoformat("2026-10-02T09:30:00+03:00")
+        == "2026-10-02T06:30:00Z"
+    )
     assert details["collection_items"][0]["wearings"][0]["rating"] == 5
     assert details["collection_items"][0]["wearings"][0]["comment"] == "Test comment"
 
